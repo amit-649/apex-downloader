@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# session & cookie data (SENSITIVE - never commit)
+/youtube_session_data/
+/temp_chrome_profile/
+cookies.txt
+youtube-cookies.txt
+*-player-script.js
+
+.vercel
+.env*
