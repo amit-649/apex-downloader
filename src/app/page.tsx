@@ -18,7 +18,12 @@ import {
   Clapperboard,
   Image as ImageIcon,
   Sparkles,
+  ShieldCheck,
+  Zap,
+  LockKeyhole,
 } from 'lucide-react';
+
+const SHOW_ADS = false; // Set to true when you want to enable sponsored banner placeholders!
 import { downloadInChunks, mergeVideoAndAudio } from '@/utils/downloader';
 
 /* ---------- Brand icons (Lucide dropped these) ---------- */
@@ -511,8 +516,8 @@ export default function Home() {
 
       {/* Hero */}
       <div className="hero">
-        <h1>Download from anywhere</h1>
-        <p>High-quality video, audio, posts, reels, stories and pins — from YouTube, Instagram, and Pinterest.</p>
+        <h1>Apex<span>Downloader</span></h1>
+        <p>Download high-quality video, audio, Reels, and stories from YouTube, Instagram, and Pinterest.</p>
       </div>
 
       <AdBanner position="top" />
@@ -633,6 +638,8 @@ export default function Home() {
       </main>
 
       <AdBanner position="bottom" />
+
+      <TrustSection />
 
       <FaqSection />
 
@@ -1088,6 +1095,8 @@ function SettingsPanel({
    Ad Banner Component
    ================================================================ */
 function AdBanner({ position }: { position: 'top' | 'bottom' }) {
+  if (!SHOW_ADS) return null;
+
   // AD NETWORK CODE PASTE AREA:
   // To paste your ad codes (Adsterra, PropellerAds, Monetag, etc.):
   // 1. Remove the <a className="ad-fallback">...</a> block below.
@@ -1108,6 +1117,39 @@ function AdBanner({ position }: { position: 'top' | 'bottom' }) {
         </a>
       </div>
     </div>
+  );
+}
+
+/* ================================================================
+   Trust Section Component
+   ================================================================ */
+function TrustSection() {
+  return (
+    <section className="trust-section">
+      <div className="trust-grid">
+        <div className="trust-card">
+          <div className="trust-icon">
+            <ShieldCheck size={26} />
+          </div>
+          <h3>Private &amp; Secure</h3>
+          <p>No downloads are processed on our servers. Video compilations happen directly in your browser.</p>
+        </div>
+        <div className="trust-card">
+          <div className="trust-icon">
+            <Zap size={24} />
+          </div>
+          <h3>High-Speed Downloads</h3>
+          <p>Direct streams with zero download limits, speed caps, or registration requirements.</p>
+        </div>
+        <div className="trust-card">
+          <div className="trust-icon">
+            <LockKeyhole size={24} />
+          </div>
+          <h3>100% Safe Connection</h3>
+          <p>Protected by SSL encryption. We do not store or track any cookies or history logs.</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
