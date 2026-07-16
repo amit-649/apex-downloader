@@ -182,6 +182,52 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Requested format not found or missing download URL' }, { status: 404 });
     }
 
+    const formatIsAudio = !format.vcodec || format.vcodec === 'none';
+    const formatParam = searchParams.get('format');
+
+    if (formatIsAudio && formatParam === 'mp3') {
+      const outputStream = new PassThrough();
+      const ffmpegCommand = ffmpeg(format.url)
+        .inputOptions('-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\nAccept-Language: en-US,en;q=0.9\r\n')
+        .audioCodec('libmp3lame')
+        .audioBitrate(192)
+        .format('mp3')
+        .on('error', (err) => {
+          console.error('FFmpeg audio transcode error:', err);
+          outputStream.destroy(err);
+        });
+
+      ffmpegCommand.stream(outputStream);
+
+      // @ts-ignore
+      const webStream = new ReadableStream({
+        start(controller) {
+          outputStream.on('data', (chunk) => controller.enqueue(chunk));
+          outputStream.on('end', () => controller.close());
+          outputStream.on('error', (err) => controller.error(err));
+        },
+        cancel() {
+          if (ffmpegCommand) {
+            try {
+              ffmpegCommand.kill('SIGKILL');
+            } catch (e) {
+              console.warn('Could not kill audio transcode process:', e);
+            }
+          }
+          outputStream.destroy();
+        }
+      });
+
+      const safeTitle = encodeURIComponent(title.replace(/[^a-zA-Z0-9]/g, '_'));
+
+      return new Response(webStream, {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Content-Disposition': `attachment; filename="${safeTitle}.mp3"`,
+        },
+      });
+    }
+
     // Proxy the direct deciphered streaming URL using Axios stream piping
     const response = await axios({
       url: format.url,

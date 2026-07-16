@@ -329,8 +329,11 @@ export default function Home() {
       setStatusText('Your download is starting in the browser…');
       logToConsole(`Requesting download for itag ${selectedVideoFormat.itag}...`);
 
+      const isAudioOnly = !selectedVideoFormat.vcodec || selectedVideoFormat.vcodec === 'none';
+      const formatQuery = isAudioOnly && !showAdvancedCodecs ? '&format=mp3' : '';
+
       try {
-        window.location.href = `/api/youtube/download?url=${encodeURIComponent(url)}&itag=${selectedVideoFormat.itag}&title=${encodeURIComponent(cleanTitle)}&cookies=${encodeURIComponent(youtubeCookies)}`;
+        window.location.href = `/api/youtube/download?url=${encodeURIComponent(url)}&itag=${selectedVideoFormat.itag}&title=${encodeURIComponent(cleanTitle)}&cookies=${encodeURIComponent(youtubeCookies)}${formatQuery}`;
         logToConsole('Direct stream download requested. Handed over to browser downloader.');
       } catch (err: any) {
         setDownloadStatus('failed');
@@ -751,12 +754,17 @@ function YoutubeView({
                 key={`${f.itag}-${idx}`}
                 selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
                 onClick={() => selectYtFormat(f, false)}
-                title={f.qualityLabel}
+                title={showAdvancedCodecs ? f.qualityLabel : 'MP3'}
                 badges={[
-                  { label: `${f.container} · ${f.codec}`, kind: 'accent' },
-                  f.audioBitrate ? { label: `${f.audioBitrate} kbps` } : null,
+                  {
+                    label: showAdvancedCodecs
+                      ? `${f.container} · ${f.codec}`
+                      : 'MP3 · 192kbps (Auto-Converted)',
+                    kind: 'accent',
+                  },
+                  showAdvancedCodecs && f.audioBitrate ? { label: `${f.audioBitrate} kbps` } : null,
                 ]}
-                size={fmtSize(f.sizeBytes)}
+                size={showAdvancedCodecs ? fmtSize(f.sizeBytes) : null}
               />
             ))}
           </div>
