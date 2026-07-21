@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "youtube_session_data/**",
+    "temp_chrome_profile/**",
+    "cookies.txt",
+    "youtube-cookies.txt",
   ]),
 ]);
 

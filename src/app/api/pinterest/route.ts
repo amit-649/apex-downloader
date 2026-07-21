@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { assertPinterestUrl } from '@/utils/platform-url';
+
+export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -16,7 +19,12 @@ export async function GET(request: Request) {
   };
 
   try {
-    const response = await axios.get(url, { headers, timeout: 8000 });
+    const pinterestUrl = assertPinterestUrl(url);
+    const response = await axios.get(pinterestUrl.toString(), {
+      headers,
+      timeout: 8000,
+      maxRedirects: 0,
+    });
     const html = response.data;
     const $ = cheerio.load(html);
 
@@ -116,8 +124,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: 'Could not extract Pinterest media URL' }, { status: 404 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error extracting Pinterest data:', error);
-    return NextResponse.json({ error: error.message || 'Pinterest extraction failed' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Pinterest extraction failed';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -1,11 +1,13 @@
 const puppeteer = require('puppeteer');
 const { spawn, execSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const readline = require('readline');
 
 const CHROME_EXE = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const SESSION_DIR = path.join(process.cwd(), 'youtube_session_data');
+const LEGACY_SESSION_DIR = path.join(process.cwd(), 'youtube_session_data');
+const SESSION_DIR = process.env.APEXDOWNLOADER_PROFILE_DIR || path.join(os.tmpdir(), 'apexdownloader-session');
 const COOKIES_TXT_PATH = path.join(process.cwd(), 'cookies.txt');
 const ENV_LOCAL_PATH = path.join(process.cwd(), '.env.local');
 
@@ -15,6 +17,19 @@ const runBoth = args.includes('--both') || args.length === 0;
 const runYt = args.includes('--youtube') || runBoth;
 const runIg = args.includes('--instagram') || runBoth;
 const syncOnly = args.includes('--sync-only');
+
+function migrateLegacySession() {
+  if (SESSION_DIR === LEGACY_SESSION_DIR || !fs.existsSync(LEGACY_SESSION_DIR) || fs.existsSync(SESSION_DIR)) {
+    return;
+  }
+
+  try {
+    fs.renameSync(LEGACY_SESSION_DIR, SESSION_DIR);
+    console.log(`📦 Moved the Chrome profile outside the project: ${SESSION_DIR}`);
+  } catch (error) {
+    console.warn('Could not move the legacy Chrome profile automatically. Close Chrome and move it outside the project before building.', error.message);
+  }
+}
 
 function askQuestion(query) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -212,6 +227,7 @@ async function killSessionChrome() {
 // Main Pipeline Orchestrator
 // ============================================================
 async function run() {
+  migrateLegacySession();
   console.log('╔══════════════════════════════════════════════════╗');
   console.log('║   Unified Cookie Refresher & Vercel Sync Tool    ║');
   console.log('╚══════════════════════════════════════════════════╝\n');

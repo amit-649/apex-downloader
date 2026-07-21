@@ -38,17 +38,50 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<FFmpeg> {
 export async function downloadInChunks(
   streamUrl: string,
   totalBytes: number,
-  onProgress: (percent: number, speedMbps: number) => void
+  onProgress: (percent: number, speedMbps: number) => void,
+  signal?: AbortSignal
 ): Promise<Blob> {
   const chunks: ArrayBuffer[] = [];
   let downloadedBytes = 0;
   const startTime = Date.now();
 
-  const numChunks = Math.ceil(totalBytes / CHUNK_SIZE);
+  const safeTotalBytes = totalBytes && totalBytes > 0 ? totalBytes : 0;
+
+  if (safeTotalBytes === 0) {
+    // Dynamic single-pass download when total file size is unknown upfront
+    const proxyUrl = `/api/youtube/download?action=proxy&streamUrl=${encodeURIComponent(streamUrl)}`;
+    const response = await fetch(proxyUrl, { signal });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch media stream: ${response.statusText}`);
+    }
+    const reader = response.body?.getReader();
+    if (!reader) {
+      const buf = await response.arrayBuffer();
+      onProgress(100, 0);
+      return new Blob([buf]);
+    }
+    const contentLength = response.headers.get('Content-Length');
+    const expected = contentLength ? parseInt(contentLength, 10) : 0;
+    while (true) {
+      if (signal?.aborted) throw new Error('Download canceled');
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
+      downloadedBytes += value.length;
+      const elapsedSeconds = (Date.now() - startTime) / 1000;
+      const speedMbps = elapsedSeconds > 0 ? (downloadedBytes * 8) / (1024 * 1024 * elapsedSeconds) : 0;
+      const percent = expected > 0 ? Math.min((downloadedBytes / expected) * 100, 100) : 50;
+      onProgress(percent, speedMbps);
+    }
+    return new Blob(chunks);
+  }
+
+  const numChunks = Math.ceil(safeTotalBytes / CHUNK_SIZE);
 
   for (let i = 0; i < numChunks; i++) {
+    if (signal?.aborted) throw new Error('Download canceled');
     const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE - 1, totalBytes - 1);
+    const end = Math.min(start + CHUNK_SIZE - 1, safeTotalBytes - 1);
 
     const rangeHeader = `bytes=${start}-${end}`;
     const proxyUrl = `/api/youtube/download?action=proxy&streamUrl=${encodeURIComponent(streamUrl)}`;
@@ -58,11 +91,13 @@ export async function downloadInChunks(
     let resData: ArrayBuffer | null = null;
 
     while (retryCount < 3 && !success) {
+      if (signal?.aborted) throw new Error('Download canceled');
       try {
         const response = await fetch(proxyUrl, {
           headers: {
             'Range': rangeHeader,
           },
+          signal,
         });
 
         if (!response.ok && response.status !== 206) {
@@ -71,7 +106,10 @@ export async function downloadInChunks(
 
         resData = await response.arrayBuffer();
         success = true;
-      } catch (err) {
+      } catch (err: unknown) {
+        if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+          throw new Error('Download canceled');
+        }
         retryCount++;
         if (retryCount >= 3) throw err;
         await new Promise(resolve => setTimeout(resolve, 1000)); // exponential backoff
@@ -86,7 +124,7 @@ export async function downloadInChunks(
       const elapsedSeconds = (Date.now() - startTime) / 1000;
       const speedMbps = elapsedSeconds > 0 ? (downloadedBytes * 8) / (1024 * 1024 * elapsedSeconds) : 0;
       
-      const percent = Math.min((downloadedBytes / totalBytes) * 100, 100);
+      const percent = Math.min((downloadedBytes / safeTotalBytes) * 100, 100);
       onProgress(percent, speedMbps);
     }
   }
@@ -146,7 +184,10 @@ export async function mergeVideoAndAudio(
     console.warn('Failed to clean virtual filesystem:', e);
   }
 
-  // Create a Blob from the Uint8Array
-  // @ts-ignore
-  return new Blob([mergedData.buffer], { type: 'video/mp4' });
+  // Create a Blob from Uint8Array or String
+  const uint8Data = typeof mergedData === 'string'
+    ? new TextEncoder().encode(mergedData)
+    : mergedData;
+
+  return new Blob([uint8Data.buffer as ArrayBuffer], { type: 'video/mp4' });
 }

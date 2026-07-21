@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ApexDownloader — High Speed Multi-Platform Media Downloader
 
-## Getting Started
+ApexDownloader is a modern, high-performance web application designed for downloading high-resolution video and audio from **YouTube**, **Instagram**, and **Pinterest**.
 
-First, run the development server:
+---
+
+## ⚡ Features
+
+- **YouTube 4K & High-Res Audio**: Extract up to 4K 60fps video and AAC/MP3 audio. Server-side merging and fast client-side in-browser FFmpeg WebAssembly compilation are supported.
+- **Instagram Reels, Stories & Carousels**: Download public posts, Reels, active user stories, carousel galleries, and HD profile pictures. Batch download supported for galleries and stories.
+- **Pinterest Video & High-Res Pins**: Download original resolution image pins and MP4 video pins.
+- **Clipboard & Quick Controls**: One-click "Paste from Clipboard" and "Clear" input actions.
+- **Cancel & History**: Abort active downloads at any time and view recent download history saved locally in your browser.
+- **Server Authorization**: Service account cookies remain on the server; visitors never submit personal credentials.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js**: v18.x or later
+- **npm** / **pnpm** / **yarn**
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Install dependencies
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Running Locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Start the Next.js development server
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🔑 Environment Variables & Cookie Synchronization
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To bypass platform rate limits and bot verification, high-resolution YouTube extractions and Instagram Story requests rely on server authorization tokens.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Configuration (`.env.local`)
 
-## Deploy on Vercel
+Create or update `.env.local` in the project root with the following keys:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```env
+YOUTUBE_COOKIES="SID=...; HSID=...; ..."
+INSTAGRAM_COOKIES="sessionid=...; ds_user_id=...; ..."
+INSTAGRAM_SESSION_ID="your_instagram_session_id"
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Automated Cookie Synchronization Tool
+
+The project includes an automated script that opens a native Chrome session to refresh session tokens and sync them with Vercel Production deployments.
+
+```bash
+# Launch interactive Cookie Sync Utility
+sync.bat
+
+# Or run directly via Node.js
+node scripts/sync_cookies.js --both
+```
+
+---
+
+## 🛠️ Build & Verification Commands
+
+```bash
+# Check TypeScript compilation
+npx tsc --noEmit
+
+# Run ESLint check
+npm run lint
+
+# Build production bundle
+npm run build
+```
+
+---
+
+## 📄 License
+
+Private / Proprietary project. All rights reserved.

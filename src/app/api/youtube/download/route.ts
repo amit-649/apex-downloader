@@ -1,279 +1,244 @@
 import { NextResponse } from 'next/server';
 import { getInfo } from '@/utils/ytdlp';
+import { assertMediaUrl, assertYoutubeUrl } from '@/utils/platform-url';
 import ffmpegPath from '@ffmpeg-installer/ffmpeg';
 import ffmpeg from 'fluent-ffmpeg';
-import { PassThrough } from 'stream';
+import { PassThrough, Readable } from 'stream';
 import axios from 'axios';
 
-// Configure local FFmpeg path
+export const runtime = 'nodejs';
+
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
+
+// Configure local FFmpeg path.
 try {
   ffmpeg.setFfmpegPath(ffmpegPath.path);
-  console.log('FFmpeg configured at path:', ffmpegPath.path);
-} catch (e) {
-  console.warn('Could not set local FFmpeg path, server-side merge might fail:', e);
+} catch (error) {
+  console.warn('Could not configure local FFmpeg; server-side merge will be unavailable:', error);
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function safeFilename(value: string, fallback: string): string {
+  const filename = value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180);
+  return filename || fallback;
+}
+
+function isSafeFormatId(value: string): boolean {
+  return /^[a-zA-Z0-9._-]{1,32}$/.test(value);
+}
+
+function getSafeRange(value: string | null): string | undefined {
+  if (!value || !/^bytes=\d+-\d*$/.test(value)) return undefined;
+  return value;
+}
+
+function toWebStream(stream: Readable): ReadableStream<Uint8Array> {
+  return Readable.toWeb(stream) as ReadableStream<Uint8Array>;
+}
+
+function createProxyResponse(stream: Readable, status: number, sourceHeaders: Record<string, unknown>): Response {
+  const headers = new Headers({
+    'Content-Type': String(sourceHeaders['content-type'] || 'application/octet-stream'),
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'private, no-store',
+  });
+
+  for (const header of ['content-range', 'content-length']) {
+    const value = sourceHeaders[header];
+    if (value) headers.set(header, String(value));
+  }
+
+  return new Response(toWebStream(stream), { status, headers });
+}
+
+async function proxyMedia(streamUrl: string, range: string | null): Promise<Response> {
+  const mediaUrl = assertMediaUrl(streamUrl);
+  const safeRange = getSafeRange(range);
+  const headers: Record<string, string> = { ...BROWSER_HEADERS };
+  if (safeRange) headers.Range = safeRange;
+
+  const response = await axios({
+    url: mediaUrl.toString(),
+    method: 'GET',
+    headers,
+    responseType: 'stream',
+    timeout: 30_000,
+    maxRedirects: 0,
+    decompress: false,
+    validateStatus: (status) => status >= 200 && status < 300,
+  });
+
+  const contentType = String(response.headers['content-type'] || 'application/octet-stream');
+  if (!/^(?:video|audio|image)\//.test(contentType) && contentType !== 'application/octet-stream') {
+    (response.data as Readable).destroy();
+    throw new Error('The media host returned an unsupported response type.');
+  }
+
+  const passThrough = new PassThrough();
+  (response.data as Readable).pipe(passThrough);
+  return createProxyResponse(passThrough, response.status, response.headers as Record<string, unknown>);
+}
+
+function startMerge(videoUrl: string, audioUrl: string): { output: PassThrough; command: ReturnType<typeof ffmpeg> } {
+  const output = new PassThrough();
+  const command = ffmpeg()
+    .input(videoUrl)
+    .inputOptions('-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`)
+    .videoCodec('copy')
+    .input(audioUrl)
+    .inputOptions('-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`)
+    .audioCodec('aac')
+    .format('mp4')
+    .outputOptions('-map 0:v:0')
+    .outputOptions('-map 1:a:0')
+    .outputOptions('-shortest')
+    .on('error', (error) => {
+      console.error('FFmpeg merge error:', error);
+      output.destroy(error);
+    });
+
+  command.stream(output);
+  return { output, command };
+}
+
+function startAudioTranscode(sourceUrl: string): { output: PassThrough; command: ReturnType<typeof ffmpeg> } {
+  const output = new PassThrough();
+  const command = ffmpeg(sourceUrl)
+    .inputOptions('-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`)
+    .audioCodec('libmp3lame')
+    .audioBitrate(192)
+    .format('mp3')
+    .on('error', (error) => {
+      console.error('FFmpeg audio transcode error:', error);
+      output.destroy(error);
+    });
+
+  command.stream(output);
+  return { output, command };
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const action = searchParams.get('action'); // 'proxy' or 'merge'
-  const youtubeCookies = request.headers.get('X-YouTube-Cookies') || searchParams.get('cookies') || '';
+  const action = searchParams.get('action');
 
-  // 1. ACTION: PROXY (Range-based streaming to bypass CORS for client WASM)
+  // Proxy only known platform CDNs. This endpoint deliberately never accepts
+  // credentials from the browser; platform authorization stays in server env vars.
   if (action === 'proxy') {
     const streamUrl = searchParams.get('streamUrl');
     if (!streamUrl) {
       return NextResponse.json({ error: 'streamUrl is required' }, { status: 400 });
     }
 
-    const rangeHeader = request.headers.get('range');
-    const headers: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    };
-
-    if (rangeHeader) {
-      headers['Range'] = rangeHeader;
-    }
-
     try {
-      const response = await axios({
-        url: streamUrl,
-        method: 'GET',
-        headers,
-        responseType: 'stream',
-        validateStatus: () => true, // Accept 206 Partial Content
-      });
-
-      const passThrough = new PassThrough();
-      response.data.pipe(passThrough);
-
-      // Convert Node stream to Web ReadableStream
-      // @ts-ignore
-      const webStream = new ReadableStream({
-        start(controller) {
-          passThrough.on('data', (chunk) => controller.enqueue(chunk));
-          passThrough.on('end', () => controller.close());
-          passThrough.on('error', (err) => controller.error(err));
-        },
-        cancel() {
-          response.data.destroy();
-        }
-      });
-
-      const resHeaders: Record<string, string> = {
-        'Content-Type': String(response.headers['content-type'] || 'video/mp4'),
-        'Accept-Ranges': 'bytes',
-      };
-
-      if (response.headers['content-range']) {
-        resHeaders['Content-Range'] = String(response.headers['content-range']);
-      }
-      if (response.headers['content-length']) {
-        resHeaders['Content-Length'] = String(response.headers['content-length']);
-      }
-
-      return new Response(webStream, {
-        status: response.status,
-        headers: resHeaders,
-      });
-    } catch (error: any) {
-      console.error('Error in range-based YouTube proxy:', error);
-      return NextResponse.json({ error: 'Proxy request failed' }, { status: 500 });
+      return await proxyMedia(streamUrl, request.headers.get('range'));
+    } catch (error: unknown) {
+      console.error('Error in media proxy:', error);
+      return NextResponse.json({ error: errorMessage(error, 'Proxy request failed') }, { status: 400 });
     }
   }
 
-  // 2. ACTION: MERGE (Local server merging of separate audio and video streams)
   if (action === 'merge') {
     const url = searchParams.get('url');
     const videoItag = searchParams.get('videoItag');
     const audioItag = searchParams.get('audioItag');
     const title = searchParams.get('title') || 'video';
 
-    if (!url || !videoItag || !audioItag) {
-      return NextResponse.json({ error: 'url, videoItag, and audioItag are required' }, { status: 400 });
+    if (!url || !videoItag || !audioItag || !isSafeFormatId(videoItag) || !isSafeFormatId(audioItag)) {
+      return NextResponse.json({ error: 'A valid video URL and format selections are required.' }, { status: 400 });
     }
 
     try {
-      // Retrieve direct YouTube URLs for both video and audio formats using yt-dlp
-      const info = await getInfo(url, youtubeCookies);
-
-      const videoFormat = info.formats.find(f => String(f.format_id) === String(videoItag));
-      const audioFormat = info.formats.find(f => String(f.format_id) === String(audioItag));
+      const info = await getInfo(assertYoutubeUrl(url).toString());
+      const videoFormat = info.formats.find((format) => String(format.format_id) === videoItag);
+      const audioFormat = info.formats.find((format) => String(format.format_id) === audioItag);
 
       if (!videoFormat?.url || !audioFormat?.url) {
-        return NextResponse.json({ error: 'Video or audio format URL not found' }, { status: 404 });
+        return NextResponse.json({ error: 'Video or audio format URL not found.' }, { status: 404 });
       }
 
-      const videoUrl = videoFormat.url;
-      const audioUrl = audioFormat.url;
-      const outputStream = new PassThrough();
-      let ffmpegCommand: any = null;
+      const { output } = startMerge(
+        assertMediaUrl(videoFormat.url).toString(),
+        assertMediaUrl(audioFormat.url).toString(),
+      );
+      const filename = safeFilename(title, 'video');
 
-      // Pass HTTPS streaming URLs directly to local FFmpeg
-      ffmpegCommand = ffmpeg()
-        .input(videoUrl)
-        .inputOptions('-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\nAccept-Language: en-US,en;q=0.9\r\n')
-        .videoCodec('copy')
-        .input(audioUrl)
-        .inputOptions('-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\nAccept-Language: en-US,en;q=0.9\r\n')
-        .audioCodec('aac')
-        .format('mp4')
-        .outputOptions('-map 0:v:0')
-        .outputOptions('-map 1:a:0')
-        .outputOptions('-shortest')
-        .on('error', (err) => {
-          console.error('FFmpeg merge error:', err);
-          outputStream.destroy(err);
-        });
-
-      ffmpegCommand.stream(outputStream);
-
-      // Convert Node PassThrough stream to Web ReadableStream
-      // @ts-ignore
-      const webStream = new ReadableStream({
-        start(controller) {
-          outputStream.on('data', (chunk) => controller.enqueue(chunk));
-          outputStream.on('end', () => controller.close());
-          outputStream.on('error', (err) => controller.error(err));
-        },
-        cancel() {
-          if (ffmpegCommand) {
-            try {
-              ffmpegCommand.kill('SIGKILL');
-            } catch (e) {
-              console.warn('Could not kill FFmpeg process:', e);
-            }
-          }
-          outputStream.destroy();
-        }
-      });
-
-      const safeTitle = encodeURIComponent(title.replace(/[^a-zA-Z0-9]/g, '_'));
-
-      return new Response(webStream, {
+      return new Response(toWebStream(output), {
         headers: {
           'Content-Type': 'video/mp4',
-          'Content-Disposition': `attachment; filename="${safeTitle}.mp4"`,
+          'Content-Disposition': `attachment; filename="${filename}.mp4"`,
+          'Cache-Control': 'private, no-store',
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error during local server merge download:', error);
-      let userMessage = error.message || 'Server merge failed';
-      if (userMessage.includes('confirm you') && userMessage.includes('bot')) {
-        userMessage = 'YouTube is requesting bot verification. Please export your session cookies to cookies.txt / youtube-cookies.txt in the project root folder to download this restricted video.';
-      }
-      return NextResponse.json({ error: userMessage }, { status: 500 });
+      return NextResponse.json({ error: errorMessage(error, 'Server merge failed') }, { status: 500 });
     }
   }
 
-  // 3. ACTION: SINGLE (Direct proxy of audio-only or pre-merged video)
   const url = searchParams.get('url');
   const itag = searchParams.get('itag');
   const title = searchParams.get('title') || 'download';
 
-  if (!url || !itag) {
-    return NextResponse.json({ error: 'url and itag are required for single format' }, { status: 400 });
+  if (!url || !itag || !isSafeFormatId(itag)) {
+    return NextResponse.json({ error: 'A valid YouTube URL and format selection are required.' }, { status: 400 });
   }
 
   try {
-    const info = await getInfo(url, youtubeCookies);
-    const format = info.formats.find(f => String(f.format_id) === String(itag));
+    const info = await getInfo(assertYoutubeUrl(url).toString());
+    const format = info.formats.find((candidate) => String(candidate.format_id) === itag);
 
     if (!format?.url) {
-      return NextResponse.json({ error: 'Requested format not found or missing download URL' }, { status: 404 });
+      return NextResponse.json({ error: 'Requested format not found or missing download URL.' }, { status: 404 });
     }
 
     const formatIsAudio = !format.vcodec || format.vcodec === 'none';
-    const formatParam = searchParams.get('format');
+    const wantsMp3 = searchParams.get('format') === 'mp3';
+    const filename = safeFilename(title, 'download');
 
-    if (formatIsAudio && formatParam === 'mp3') {
-      const outputStream = new PassThrough();
-      const ffmpegCommand = ffmpeg(format.url)
-        .inputOptions('-headers', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\nAccept-Language: en-US,en;q=0.9\r\n')
-        .audioCodec('libmp3lame')
-        .audioBitrate(192)
-        .format('mp3')
-        .on('error', (err) => {
-          console.error('FFmpeg audio transcode error:', err);
-          outputStream.destroy(err);
-        });
-
-      ffmpegCommand.stream(outputStream);
-
-      // @ts-ignore
-      const webStream = new ReadableStream({
-        start(controller) {
-          outputStream.on('data', (chunk) => controller.enqueue(chunk));
-          outputStream.on('end', () => controller.close());
-          outputStream.on('error', (err) => controller.error(err));
-        },
-        cancel() {
-          if (ffmpegCommand) {
-            try {
-              ffmpegCommand.kill('SIGKILL');
-            } catch (e) {
-              console.warn('Could not kill audio transcode process:', e);
-            }
-          }
-          outputStream.destroy();
-        }
-      });
-
-      const safeTitle = encodeURIComponent(title.replace(/[^a-zA-Z0-9]/g, '_'));
-
-      return new Response(webStream, {
+    if (formatIsAudio && wantsMp3) {
+      const { output } = startAudioTranscode(assertMediaUrl(format.url).toString());
+      return new Response(toWebStream(output), {
         headers: {
           'Content-Type': 'audio/mpeg',
-          'Content-Disposition': `attachment; filename="${safeTitle}.mp3"`,
+          'Content-Disposition': `attachment; filename="${filename}.mp3"`,
+          'Cache-Control': 'private, no-store',
         },
       });
     }
 
-    // Proxy the direct deciphered streaming URL using Axios stream piping
     const response = await axios({
-      url: format.url,
+      url: assertMediaUrl(format.url).toString(),
       method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
+      headers: BROWSER_HEADERS,
       responseType: 'stream',
+      timeout: 30_000,
+      maxRedirects: 0,
+      decompress: false,
+      validateStatus: (status) => status >= 200 && status < 300,
     });
-
     const passThrough = new PassThrough();
-    response.data.pipe(passThrough);
+    (response.data as Readable).pipe(passThrough);
 
-    // @ts-ignore
-    const webStream = new ReadableStream({
-      start(controller) {
-        passThrough.on('data', (chunk) => controller.enqueue(chunk));
-        passThrough.on('end', () => controller.close());
-        passThrough.on('error', (err) => controller.error(err));
-      },
-      cancel() {
-        response.data.destroy();
-        passThrough.destroy();
-      }
+    const extension = format.ext || (formatIsAudio ? 'm4a' : 'mp4');
+    const contentType = String(response.headers['content-type'] || (formatIsAudio ? 'audio/*' : 'video/*'));
+    const headers = new Headers({
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}.${extension}"`,
+      'Cache-Control': 'private, no-store',
     });
-
-    const isAudio = !format.vcodec || format.vcodec === 'none';
-    const ext = format.ext || (isAudio ? 'mp3' : 'mp4');
-    const contentType = isAudio ? 'audio/mpeg' : 'video/mp4';
-    const safeTitle = encodeURIComponent(title.replace(/[^a-zA-Z0-9]/g, '_'));
-    const contentLength = format.filesize || format.filesize_approx || '';
-
-    return new Response(webStream, {
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${safeTitle}.${ext}"`,
-        'Content-Length': String(contentLength),
-      },
-    });
-  } catch (error: any) {
-    console.error('Error in single format download:', error);
-    let userMessage = error.message || 'Download failed';
-    if (userMessage.includes('confirm you') && userMessage.includes('bot')) {
-      userMessage = 'YouTube is requesting bot verification. Please export your session cookies to cookies.txt / youtube-cookies.txt in the project root folder to download this restricted video.';
+    if (response.headers['content-length']) {
+      headers.set('Content-Length', String(response.headers['content-length']));
     }
-    return NextResponse.json({ error: userMessage }, { status: 500 });
+
+    return new Response(toWebStream(passThrough), { headers });
+  } catch (error: unknown) {
+    console.error('Error in single format download:', error);
+    return NextResponse.json({ error: errorMessage(error, 'Download failed') }, { status: 500 });
   }
 }

@@ -319,9 +319,36 @@ body::after {
   color: var(--text-primary);
   font-family: inherit;
   font-size: 1rem;
-  padding: 0.9rem 1.1rem 0.9rem 2.8rem;
+  padding: 0.9rem 6rem 0.9rem 2.8rem;
   outline: none;
   transition: all 0.3s ease;
+}
+
+.input-actions {
+  position: absolute;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.input-action-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
+}
+
+.input-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
 }
 
 .url-input::placeholder {
@@ -1316,6 +1343,7 @@ body::after {
     padding: 1rem;
     gap: 1rem;
     align-items: center;
+    text-align: center;
   }
   .thumb {
     max-width: 100%;
@@ -1323,7 +1351,7 @@ body::after {
     aspect-ratio: 16/9;
   }
   .thumb-portrait {
-    max-width: 180px;
+    max-width: 200px;
     aspect-ratio: 9/16;
     margin: 0 auto;
   }
@@ -1332,8 +1360,16 @@ body::after {
     text-align: center;
     width: 100%;
   }
-  .preview-body .btn {
+  .preview-body .btn,
+  .preview-btn {
     align-self: center !important;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 100%;
+  }
+  .caption {
+    text-align: center;
+    width: 100%;
   }
   
   /* Stacking trust badges */

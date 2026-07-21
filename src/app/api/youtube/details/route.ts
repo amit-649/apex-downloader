@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getInfo } from '@/utils/ytdlp';
+import { assertYoutubeUrl } from '@/utils/platform-url';
+
+export const runtime = 'nodejs';
 
 function getCodecName(codec?: string): string {
   if (!codec) return 'Unknown';
@@ -20,10 +23,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'YouTube URL is required' }, { status: 400 });
   }
 
-  const youtubeCookies = request.headers.get('X-YouTube-Cookies') || '';
-
   try {
-    const info = await getInfo(url, youtubeCookies);
+    const youtubeUrl = assertYoutubeUrl(url);
+    const info = await getInfo(youtubeUrl.toString());
 
     // Map formats
     const formats = (info.formats || []).map((f) => {
@@ -110,12 +112,12 @@ export async function GET(request: Request) {
         audioOnly,
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching YouTube details:', error);
     // If it is a bot-protection block, return a user-friendly instruction
-    let userMessage = error.message || 'Failed to retrieve video details';
+    let userMessage = error instanceof Error ? error.message : 'Failed to retrieve video details';
     if (userMessage.includes('confirm you') && userMessage.includes('bot')) {
-      userMessage = 'YouTube is requesting bot verification. Please export your session cookies to cookies.txt / youtube-cookies.txt in the project root folder to download this restricted video.';
+      userMessage = 'YouTube is requesting bot verification. Please refresh the service authorization cookies and try again.';
     }
     return NextResponse.json({ error: userMessage }, { status: 500 });
   }

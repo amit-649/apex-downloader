@@ -10,10 +10,8 @@ import {
   RefreshCw,
   CheckCircle,
   AlertCircle,
-  Trash2,
   Info,
   Lock,
-  ExternalLink,
   ChevronDown,
   Clapperboard,
   Image as ImageIcon,
@@ -21,6 +19,11 @@ import {
   ShieldCheck,
   Zap,
   LockKeyhole,
+  Clipboard,
+  X,
+  Square,
+  History,
+  Clock,
 } from 'lucide-react';
 
 const SHOW_ADS = false; // Set to true when you want to enable sponsored banner placeholders!
@@ -67,6 +70,77 @@ type DownloadStatus =
   | 'handoff'
   | 'completed'
   | 'failed';
+type MediaType = 'image' | 'video';
+
+type HistoryItem = {
+  id: string;
+  title: string;
+  platform: Platform;
+  url: string;
+  timestamp: number;
+};
+
+type YoutubeFormat = {
+  itag: number | string;
+  url: string;
+  qualityLabel: string;
+  container: string;
+  codec: string;
+  hasVideo: boolean;
+  hasAudio: boolean;
+  fps: number | null;
+  sizeBytes: number | null;
+  audioBitrate: number | null;
+};
+
+type YoutubeMetadata = {
+  title: string;
+  description: string;
+  duration: number;
+  author: string;
+  authorUrl: string;
+  thumbnail: string;
+  isRestricted: boolean;
+  formats: {
+    videoWithAudio: YoutubeFormat[];
+    videoOnly: YoutubeFormat[];
+    audioOnly: YoutubeFormat[];
+  };
+};
+
+type InstagramItem = {
+  id: string;
+  type: MediaType;
+  isVideo?: boolean;
+  downloadUrl: string;
+  thumbnailUrl: string;
+};
+
+type InstagramMetadata = {
+  type: 'profile_pic' | 'video' | 'image' | 'stories_list' | 'story' | 'carousel';
+  username?: string;
+  fullName?: string;
+  biography?: string;
+  followers?: number;
+  caption?: string;
+  downloadUrl: string;
+  thumbnailUrl: string;
+  items?: InstagramItem[];
+};
+
+type PinterestMetadata = {
+  type: MediaType;
+  title: string;
+  description: string;
+  downloadUrl: string;
+  thumbnailUrl: string;
+};
+
+type Badge = { label: string; kind?: 'success' | 'accent' };
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
 /* ---------- Formatting helpers ---------- */
 const fmtDuration = (s?: number) => {
@@ -108,51 +182,54 @@ export default function Home() {
   // Navigation & URL input
   const [activeTab, setActiveTab] = useState<Platform>('youtube');
   const [showSettings, setShowSettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [url, setUrl] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Metadata
-  const [ytMetadata, setYtMetadata] = useState<any>(null);
-  const [instaMetadata, setInstaMetadata] = useState<any>(null);
-  const [pinMetadata, setPinMetadata] = useState<any>(null);
+  const [ytMetadata, setYtMetadata] = useState<YoutubeMetadata | null>(null);
+  const [instaMetadata, setInstaMetadata] = useState<InstagramMetadata | null>(null);
+  const [pinMetadata, setPinMetadata] = useState<PinterestMetadata | null>(null);
 
   // YouTube selection
-  const [selectedVideoFormat, setSelectedVideoFormat] = useState<any>(null);
-  const [selectedAudioFormat, setSelectedAudioFormat] = useState<any>(null);
+  const [selectedVideoFormat, setSelectedVideoFormat] = useState<YoutubeFormat | null>(null);
+  const [selectedAudioFormat, setSelectedAudioFormat] = useState<YoutubeFormat | null>(null);
   const [isSplitSelection, setIsSplitSelection] = useState(false);
   const [showAdvancedCodecs, setShowAdvancedCodecs] = useState(false);
 
-  // Compatibility filter (MP4/H.264 prioritization)
-  const getCompatibleFormats = (formats: any[], isVideo: boolean) => {
-    if (showAdvancedCodecs || !formats) return formats;
+  // Compatibility filter (MP4/H.264 prioritization & Audio streamlining)
+  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean): YoutubeFormat[] => {
+    if (showAdvancedCodecs) return formats;
 
-    const grouped = new Map<string, any>();
+    if (!isVideo) {
+      // Keep only top High Quality (~320kbps) and Standard (~140kbps) audio options in basic mode
+      const sorted = [...formats].sort((a, b) => (b.audioBitrate || b.sizeBytes || 0) - (a.audioBitrate || a.sizeBytes || 0));
+      if (sorted.length === 0) return [];
+      const best = sorted[0];
+      const standard = sorted.find((f) => f.audioBitrate && f.audioBitrate <= 160 && f.itag !== best.itag);
+      return standard ? [best, standard] : [best];
+    }
+
+    const grouped = new Map<string, YoutubeFormat>();
 
     for (const f of formats) {
-      const key = isVideo ? `${f.qualityLabel}-${f.fps || ''}` : `${f.audioBitrate || ''}`;
+      const key = `${f.qualityLabel}-${f.fps || ''}`;
       const existing = grouped.get(key);
 
       if (!existing) {
         grouped.set(key, f);
       } else {
-        if (isVideo) {
-          const existingIsMp4 = existing.container?.toLowerCase() === 'mp4';
-          const currentIsMp4 = f.container?.toLowerCase() === 'mp4';
-          const existingIsH264 = existing.codec?.toLowerCase() === 'h.264';
-          const currentIsH264 = f.codec?.toLowerCase() === 'h.264';
+        const existingIsMp4 = existing.container?.toLowerCase() === 'mp4';
+        const currentIsMp4 = f.container?.toLowerCase() === 'mp4';
+        const existingIsH264 = existing.codec?.toLowerCase() === 'h.264';
+        const currentIsH264 = f.codec?.toLowerCase() === 'h.264';
 
-          if (currentIsMp4 && !existingIsMp4) {
-            grouped.set(key, f);
-          } else if (currentIsMp4 === existingIsMp4) {
-            if (currentIsH264 && !existingIsH264) {
-              grouped.set(key, f);
-            }
-          }
-        } else {
-          const existingIsMp4 = existing.container?.toLowerCase() === 'mp4' || existing.container?.toLowerCase() === 'm4a';
-          const currentIsMp4 = f.container?.toLowerCase() === 'mp4' || f.container?.toLowerCase() === 'm4a';
-          if (currentIsMp4 && !existingIsMp4) {
+        if (currentIsMp4 && !existingIsMp4) {
+          grouped.set(key, f);
+        } else if (currentIsMp4 === existingIsMp4) {
+          if (currentIsH264 && !existingIsH264) {
             grouped.set(key, f);
           }
         }
@@ -162,10 +239,44 @@ export default function Home() {
     return Array.from(grouped.values());
   };
 
-  // Settings
-  const [instaSessionId, setInstaSessionId] = useState('');
-  const [youtubeCookies, setYoutubeCookies] = useState('');
-  const [useLocalMerge, setUseLocalMerge] = useState(false);
+  const [useLocalMerge, setUseLocalMerge] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const storedMerge = localStorage.getItem('use_local_merge');
+      if (storedMerge !== null) return storedMerge === 'true';
+    }
+    return false;
+  });
+
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('apex_download_history');
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const addToHistory = (title: string, platform: Platform, downloadUrl: string) => {
+    const newItem: HistoryItem = {
+      id: String(Date.now()),
+      title: title || 'Download',
+      platform,
+      url: downloadUrl,
+      timestamp: Date.now(),
+    };
+    setHistory((prev) => {
+      const updated = [newItem, ...prev.filter((i) => i.url !== downloadUrl)].slice(0, 10);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('apex_download_history', JSON.stringify(updated));
+      }
+      return updated;
+    });
+  };
+
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Downloader state
   const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>('idle');
@@ -178,34 +289,44 @@ export default function Home() {
 
   const isBusy = downloadStatus === 'downloading_video' || downloadStatus === 'downloading_audio' || downloadStatus === 'merging';
 
-  // Load settings from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setInstaSessionId(localStorage.getItem('instagram_session_id') || '');
-      setYoutubeCookies(localStorage.getItem('youtube_cookies') || '');
-      
-      const storedMerge = localStorage.getItem('use_local_merge');
-      if (storedMerge === null) {
-        // Default to TRUE for client-side merging to prevent Vercel 10s timeouts
-        setUseLocalMerge(true);
-        localStorage.setItem('use_local_merge', 'true');
-      } else {
-        setUseLocalMerge(storedMerge === 'true');
-      }
-    }
-  }, []);
-
-  const saveInstaSession = (val: string) => {
-    setInstaSessionId(val);
-    localStorage.setItem('instagram_session_id', val);
-  };
-  const saveYtCookies = (val: string) => {
-    setYoutubeCookies(val);
-    localStorage.setItem('youtube_cookies', val);
-  };
   const saveMergePref = (val: boolean) => {
     setUseLocalMerge(val);
-    localStorage.setItem('use_local_merge', String(val));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('use_local_merge', String(val));
+    }
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const trimmed = text.trim();
+        setUrl(trimmed);
+        if (trimmed.includes('youtube.com') || trimmed.includes('youtu.be')) {
+          setActiveTab('youtube');
+        } else if (trimmed.includes('instagram.com')) {
+          setActiveTab('instagram');
+        } else if (trimmed.includes('pinterest.com') || trimmed.includes('pin.it')) {
+          setActiveTab('pinterest');
+        }
+      }
+    } catch {
+      // Permission or API error
+    }
+  };
+
+  const handleClear = () => {
+    setUrl('');
+  };
+
+  const cancelDownload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setDownloadStatus('failed');
+    setStatusText('Download canceled by user.');
+    logToConsole('Download task was canceled.');
   };
 
   // Auto-detect platform on paste
@@ -232,7 +353,8 @@ export default function Home() {
 
   // Fetch details
   const fetchDetails = async () => {
-    if (!url) {
+    const requestedUrl = url.trim();
+    if (!requestedUrl) {
       setError('Please paste a link first.');
       return;
     }
@@ -248,51 +370,51 @@ export default function Home() {
 
     try {
       if (activeTab === 'youtube') {
-        const res = await fetch(`/api/youtube/details?url=${encodeURIComponent(url)}`, {
-          headers: { 'X-YouTube-Cookies': youtubeCookies },
-        });
-        const data = await res.json();
+        const res = await fetch(`/api/youtube/details?url=${encodeURIComponent(requestedUrl)}`);
+        const data = await res.json() as YoutubeMetadata & { error?: string };
         if (!res.ok) throw new Error(data.error || 'Failed to fetch YouTube details');
 
         setYtMetadata(data);
 
-        const defaultMerged = data.formats?.videoWithAudio?.sort((a: any, b: any) => b.sizeBytes - a.sizeBytes)[0];
+        const defaultMerged = [...data.formats.videoWithAudio]
+          .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
         if (defaultMerged) {
           setSelectedVideoFormat(defaultMerged);
         } else {
-          const bestVideo = data.formats?.videoOnly?.sort((a: any, b: any) => b.sizeBytes - a.sizeBytes)[0];
-          const bestAudio = data.formats?.audioOnly?.sort((a: any, b: any) => b.audioBitrate - a.audioBitrate)[0];
+          const bestVideo = [...data.formats.videoOnly]
+            .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0] ?? null;
+          const bestAudio = [...data.formats.audioOnly]
+            .sort((a, b) => (b.audioBitrate ?? 0) - (a.audioBitrate ?? 0))[0] ?? null;
           setSelectedVideoFormat(bestVideo);
           setSelectedAudioFormat(bestAudio);
           setIsSplitSelection(true);
         }
       } else if (activeTab === 'instagram') {
-        const res = await fetch(`/api/instagram?url=${encodeURIComponent(url)}`, {
-          headers: { 'X-Instagram-Session': instaSessionId },
-        });
-        const data = await res.json();
+        const res = await fetch(`/api/instagram?url=${encodeURIComponent(requestedUrl)}`);
+        const data = await res.json() as InstagramMetadata & { error?: string };
         if (!res.ok) throw new Error(data.error || 'Failed to fetch Instagram details');
         setInstaMetadata(data);
       } else if (activeTab === 'pinterest') {
-        const res = await fetch(`/api/pinterest?url=${encodeURIComponent(url)}`);
-        const data = await res.json();
+        const res = await fetch(`/api/pinterest?url=${encodeURIComponent(requestedUrl)}`);
+        const data = await res.json() as PinterestMetadata & { error?: string };
         if (!res.ok) throw new Error(data.error || 'Failed to fetch Pinterest details');
         setPinMetadata(data);
       }
-      // Clear the URL input after successful fetch so user can paste a new link
+      // Keep the fetched source separately so the input can be cleared for the next link.
+      setSourceUrl(requestedUrl);
       setUrl('');
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred while fetching details.');
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, 'An unexpected error occurred while fetching details.'));
     } finally {
       setLoading(false);
     }
   };
 
-  const selectYtFormat = (format: any, isSplit: boolean) => {
+  const selectYtFormat = (format: YoutubeFormat, isSplit: boolean) => {
     setIsSplitSelection(isSplit);
     if (isSplit) {
       setSelectedVideoFormat(format);
-      if (!selectedAudioFormat && ytMetadata?.formats?.audioOnly?.length > 0) {
+      if (!selectedAudioFormat && ytMetadata?.formats.audioOnly.length) {
         setSelectedAudioFormat(ytMetadata.formats.audioOnly[0]);
       }
     } else {
@@ -314,13 +436,16 @@ export default function Home() {
 
   // Main YouTube download
   const handleYoutubeDownload = async () => {
-    if (!selectedVideoFormat) return;
+    if (!selectedVideoFormat || !sourceUrl) {
+      setError('Please fetch a YouTube video before starting a download.');
+      return;
+    }
 
     setConsoleLogs([]);
     setDownloadProgress(0);
     setDownloadSpeed(0);
 
-    const title = ytMetadata.title || 'YouTube_Video';
+    const title = ytMetadata?.title || 'YouTube_Video';
     const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
 
     // Scenario A: pre-merged or audio-only (browser handoff)
@@ -329,52 +454,70 @@ export default function Home() {
       setStatusText('Your download is starting in the browser…');
       logToConsole(`Requesting download for itag ${selectedVideoFormat.itag}...`);
 
-      const isAudioOnly = !selectedVideoFormat.vcodec || selectedVideoFormat.vcodec === 'none';
+      const isAudioOnly = !selectedVideoFormat.hasVideo;
       const formatQuery = isAudioOnly && !showAdvancedCodecs ? '&format=mp3' : '';
 
       try {
-        window.location.href = `/api/youtube/download?url=${encodeURIComponent(url)}&itag=${selectedVideoFormat.itag}&title=${encodeURIComponent(cleanTitle)}&cookies=${encodeURIComponent(youtubeCookies)}${formatQuery}`;
+        window.location.href = `/api/youtube/download?url=${encodeURIComponent(sourceUrl)}&itag=${selectedVideoFormat.itag}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
         logToConsole('Direct stream download requested. Handed over to browser downloader.');
-      } catch (err: any) {
+        addToHistory(title, 'youtube', sourceUrl);
+      } catch (error: unknown) {
         setDownloadStatus('failed');
-        setError(err.message || 'Stream download failed.');
-        logToConsole(`Error: ${err.message}`);
+        const message = getErrorMessage(error, 'Stream download failed.');
+        setError(message);
+        logToConsole(`Error: ${message}`);
       }
       return;
     }
 
     // Scenario B: server-side merge (browser handoff)
     if (useLocalMerge) {
+      if (!selectedAudioFormat) {
+        setError('No compatible audio stream was found for this video.');
+        return;
+      }
       setDownloadStatus('handoff');
       setStatusText('Server is merging your file — the download will begin shortly…');
       logToConsole(`Requesting server-side merge of video (itag: ${selectedVideoFormat.itag}) and audio (itag: ${selectedAudioFormat.itag})...`);
 
       try {
-        window.location.href = `/api/youtube/download?action=merge&url=${encodeURIComponent(url)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&title=${encodeURIComponent(cleanTitle)}&cookies=${encodeURIComponent(youtubeCookies)}`;
+        window.location.href = `/api/youtube/download?action=merge&url=${encodeURIComponent(sourceUrl)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&title=${encodeURIComponent(cleanTitle)}`;
         logToConsole('Server-side merge initiated. File is being compiled and streamed.');
-      } catch (err: any) {
+        addToHistory(title, 'youtube', sourceUrl);
+      } catch (error: unknown) {
         setDownloadStatus('failed');
-        setError(err.message || 'Server merge request failed.');
-        logToConsole(`Error: ${err.message}`);
+        const message = getErrorMessage(error, 'Server merge request failed.');
+        setError(message);
+        logToConsole(`Error: ${message}`);
       }
       return;
     }
 
     // Scenario C: client-side chunk proxy + FFmpeg WASM merge
     try {
+      if (!selectedAudioFormat) {
+        throw new Error('No compatible audio stream was found for this video.');
+      }
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
+      const videoSizeBytes = selectedVideoFormat.sizeBytes ?? 0;
+      const audioSizeBytes = selectedAudioFormat.sizeBytes ?? 0;
+
       setDownloadStatus('downloading_video');
       setStatusText('Downloading video stream in chunks...');
       logToConsole('Starting client-side range-based video chunk proxy...');
-      logToConsole(`Video format: ${selectedVideoFormat.qualityLabel} | Size: ${(selectedVideoFormat.sizeBytes / (1024 * 1024)).toFixed(2)} MB`);
+      logToConsole(`Video format: ${selectedVideoFormat.qualityLabel} | Size: ${videoSizeBytes > 0 ? (videoSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
 
       const videoBlob = await downloadInChunks(
         selectedVideoFormat.url,
-        selectedVideoFormat.sizeBytes,
+        videoSizeBytes,
         (percent, speed) => {
           setDownloadProgress(Math.round(percent));
           setDownloadSpeed(speed);
           setStatusText(`Downloading video stream: ${Math.round(percent)}%`);
-        }
+        },
+        abortController.signal
       );
 
       logToConsole('Video stream chunks download complete.');
@@ -383,16 +526,17 @@ export default function Home() {
       setDownloadProgress(0);
       setStatusText('Downloading audio stream in chunks...');
       logToConsole('Starting client-side range-based audio chunk proxy...');
-      logToConsole(`Audio format: ${selectedAudioFormat.qualityLabel} | Size: ${(selectedAudioFormat.sizeBytes / (1024 * 1024)).toFixed(2)} MB`);
+      logToConsole(`Audio format: ${selectedAudioFormat.qualityLabel} | Size: ${audioSizeBytes > 0 ? (audioSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
 
       const audioBlob = await downloadInChunks(
         selectedAudioFormat.url,
-        selectedAudioFormat.sizeBytes,
+        audioSizeBytes,
         (percent, speed) => {
           setDownloadProgress(Math.round(percent));
           setDownloadSpeed(speed);
           setStatusText(`Downloading audio stream: ${Math.round(percent)}%`);
-        }
+        },
+        abortController.signal
       );
 
       logToConsole('Audio stream chunks download complete.');
@@ -420,26 +564,32 @@ export default function Home() {
       setStatusText('Successfully merged and downloaded!');
 
       triggerBlobDownload(mergedBlob, `${cleanTitle}.mp4`);
+      addToHistory(title, 'youtube', sourceUrl);
       logToConsole('File successfully saved to your device!');
-    } catch (err: any) {
-      console.error('Error during client-side download/merge:', err);
+    } catch (error: unknown) {
+      console.error('Error during client-side download/merge:', error);
       setDownloadStatus('failed');
       setStatusText('Download or Merge failed');
-      logToConsole(`Fatal Error: ${err.message || 'An error occurred.'}`);
+      logToConsole(`Fatal Error: ${getErrorMessage(error, 'An error occurred.')}`);
+    } finally {
+      abortControllerRef.current = null;
     }
   };
 
   // Direct downloader for Instagram / Pinterest
-  const triggerDirectDownload = async (mediaUrl: string, defaultName: string) => {
+  const triggerDirectDownload = async (mediaUrl: string, defaultName: string, mediaType: MediaType) => {
     setDownloadStatus('downloading_video');
     setDownloadProgress(0);
     setStatusText('Downloading file...');
     setConsoleLogs([]);
     logToConsole(`Initiating proxy download for media URL: ${mediaUrl.substring(0, 60)}...`);
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       const proxyUrl = `/api/youtube/download?action=proxy&streamUrl=${encodeURIComponent(mediaUrl)}`;
-      const response = await fetch(proxyUrl);
+      const response = await fetch(proxyUrl, { signal: abortController.signal });
       if (!response.ok) throw new Error(`Server returned HTTP ${response.status}`);
 
       const totalBytesHeader = response.headers.get('Content-Length');
@@ -453,6 +603,7 @@ export default function Home() {
       if (!reader) throw new Error('ReadableStream not supported in this browser.');
 
       while (true) {
+        if (abortController.signal.aborted) throw new Error('Download canceled');
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
@@ -478,26 +629,52 @@ export default function Home() {
         offset += chunk.length;
       }
 
-      const ext = mediaUrl.includes('.mp4') || mediaUrl.includes('video') ? 'mp4' : 'jpg';
-      const fileBlob = new Blob([mergedArray.buffer], { type: ext === 'mp4' ? 'video/mp4' : 'image/jpeg' });
+      const responseType = response.headers.get('Content-Type') || '';
+      const isVideo = mediaType === 'video' || responseType.startsWith('video/');
+      const ext = isVideo ? 'mp4' : 'jpg';
+      const fileBlob = new Blob([mergedArray.buffer], { type: isVideo ? 'video/mp4' : 'image/jpeg' });
 
       setDownloadStatus('completed');
       setStatusText('Download completed!');
       logToConsole('Media saved successfully.');
       triggerBlobDownload(fileBlob, `${defaultName}.${ext}`);
-    } catch (error: any) {
+      addToHistory(defaultName, activeTab, mediaUrl);
+    } catch (error: unknown) {
       console.error(error);
       setDownloadStatus('failed');
       setStatusText('Proxy download failed.');
-      logToConsole(`Error: ${error.message}`);
+      logToConsole(`Error: ${getErrorMessage(error, 'Download failed.')}`);
+    } finally {
+      abortControllerRef.current = null;
     }
+  };
+
+  const triggerBatchDownload = async (items: Array<{ downloadUrl: string; isVideo?: boolean; type?: string; id?: string }>, prefix: string) => {
+    setConsoleLogs([]);
+    logToConsole(`Starting batch download of ${items.length} items...`);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const isVid = item.isVideo || item.type === 'video';
+      const name = `${prefix}_${i + 1}`;
+      logToConsole(`Downloading batch item ${i + 1}/${items.length}...`);
+      await triggerDirectDownload(item.downloadUrl, name, isVid ? 'video' : 'image');
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    logToConsole('Batch download complete!');
   };
 
   const switchTab = (tab: Platform) => {
     setActiveTab(tab);
     setUrl('');
+    setSourceUrl('');
     setError(null);
     setShowSettings(false);
+    setYtMetadata(null);
+    setInstaMetadata(null);
+    setPinMetadata(null);
+    setSelectedVideoFormat(null);
+    setSelectedAudioFormat(null);
+    setIsSplitSelection(false);
   };
 
   const hasResult =
@@ -510,10 +687,21 @@ export default function Home() {
   return (
     <div className="container">
       {/* Top bar */}
+      {/* Top bar */}
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark"><Download size={18} /></div>
           <div className="brand-name">Apex<span>Downloader</span></div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {history.length > 0 && (
+            <button className="btn btn-ghost" onClick={() => setShowHistory((open) => !open)} aria-expanded={showHistory}>
+              <History size={17} /> History ({history.length})
+            </button>
+          )}
+          <button className="btn btn-ghost" onClick={() => setShowSettings((open) => !open)} aria-expanded={showSettings}>
+            <Settings size={17} /> Settings
+          </button>
         </div>
       </header>
 
@@ -527,6 +715,23 @@ export default function Home() {
 
       {/* Main card */}
       <main className="card">
+            {showSettings && (
+              <SettingsPanel
+                useLocalMerge={useLocalMerge}
+                saveMergePref={saveMergePref}
+                onClose={() => setShowSettings(false)}
+              />
+            )}
+            {showHistory && (
+              <HistoryPanel
+                history={history}
+                onClose={() => setShowHistory(false)}
+                onClear={() => {
+                  setHistory([]);
+                  if (typeof window !== 'undefined') localStorage.removeItem('apex_download_history');
+                }}
+              />
+            )}
             {/* Tabs */}
             <div className="tabs" role="tablist" aria-label="Platform">
               {PLATFORMS.map(({ id, label, Icon }) => (
@@ -558,6 +763,17 @@ export default function Home() {
                   autoComplete="off"
                   spellCheck={false}
                 />
+                <div className="input-actions">
+                  {url ? (
+                    <button type="button" className="input-action-btn" onClick={handleClear} title="Clear input text">
+                      <X size={14} /> Clear
+                    </button>
+                  ) : (
+                    <button type="button" className="input-action-btn" onClick={handlePaste} title="Paste from clipboard">
+                      <Clipboard size={14} /> Paste
+                    </button>
+                  )}
+                </div>
               </div>
               <button className="btn btn-primary" onClick={fetchDetails} disabled={loading}>
                 {loading ? <span className="spinner" /> : <RefreshCw size={17} />}
@@ -617,7 +833,11 @@ export default function Home() {
 
             {/* Instagram */}
             {activeTab === 'instagram' && instaMetadata && (
-              <InstagramView meta={instaMetadata} onDownload={triggerDirectDownload} />
+              <InstagramView
+                meta={instaMetadata}
+                onDownload={triggerDirectDownload}
+                onBatchDownload={(items, prefix) => triggerBatchDownload(items, prefix)}
+              />
             )}
 
             {/* Pinterest */}
@@ -636,6 +856,7 @@ export default function Home() {
                 showLog={showLog}
                 setShowLog={setShowLog}
                 consoleBottomRef={consoleBottomRef}
+                onCancel={cancelDownload}
               />
             )}
       </main>
@@ -659,7 +880,18 @@ export default function Home() {
 function YoutubeView({
   meta, getCompatibleFormats, showAdvancedCodecs, setShowAdvancedCodecs,
   selectedVideoFormat, isSplitSelection, selectYtFormat, onDownload, isBusy, useLocalMerge,
-}: any) {
+}: {
+  meta: YoutubeMetadata;
+  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean) => YoutubeFormat[];
+  showAdvancedCodecs: boolean;
+  setShowAdvancedCodecs: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedVideoFormat: YoutubeFormat | null;
+  isSplitSelection: boolean;
+  selectYtFormat: (format: YoutubeFormat, isSplit: boolean) => void;
+  onDownload: () => Promise<void>;
+  isBusy: boolean;
+  useLocalMerge: boolean;
+}) {
   const hd = getCompatibleFormats(meta.formats?.videoOnly || [], true);
   const sd = getCompatibleFormats(meta.formats?.videoWithAudio || [], true);
   const audio = getCompatibleFormats(meta.formats?.audioOnly || [], false);
@@ -671,7 +903,7 @@ function YoutubeView({
           <Lock size={17} />
           <span>
             <strong>Limited mode:</strong> bot protection is active on this video, so it was fetched via mobile
-            emulation (360p). To unlock 1080p/4K, add your cookies in Settings or a <code>cookies.txt</code> in the project root.
+            emulation (360p). To unlock 1080p/4K, refresh the service authorization cookies and try again.
           </span>
         </div>
       )}
@@ -708,7 +940,7 @@ function YoutubeView({
         <>
           <div className="subhead">High definition · merged in your browser</div>
           <div className="format-grid">
-            {hd.map((f: any, idx: number) => (
+            {hd.map((f, idx) => (
               <FormatCard
                 key={`${f.itag}-${idx}`}
                 selected={selectedVideoFormat?.itag === f.itag && isSplitSelection}
@@ -729,7 +961,7 @@ function YoutubeView({
         <>
           <div className="subhead">Standard · direct download</div>
           <div className="format-grid">
-            {sd.map((f: any, idx: number) => (
+            {sd.map((f, idx) => (
               <FormatCard
                 key={`${f.itag}-${idx}`}
                 selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
@@ -749,24 +981,36 @@ function YoutubeView({
             <div className="section-title"><AudioLines size={18} /> Audio only</div>
           </div>
           <div className="format-grid">
-            {audio.map((f: any, idx: number) => (
-              <FormatCard
-                key={`${f.itag}-${idx}`}
-                selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
-                onClick={() => selectYtFormat(f, false)}
-                title={showAdvancedCodecs ? f.qualityLabel : 'MP3'}
-                badges={[
-                  {
-                    label: showAdvancedCodecs
-                      ? `${f.container} · ${f.codec}`
-                      : 'MP3 · 192kbps (Auto-Converted)',
-                    kind: 'accent',
-                  },
-                  showAdvancedCodecs && f.audioBitrate ? { label: `${f.audioBitrate} kbps` } : null,
-                ]}
-                size={showAdvancedCodecs ? fmtSize(f.sizeBytes) : null}
-              />
-            ))}
+            {audio.map((f, idx) => {
+              const isBest = idx === 0;
+              const badgeLabel = showAdvancedCodecs
+                ? `${f.container} · ${f.codec}`
+                : isBest
+                ? 'MP3 · High Quality (~320kbps)'
+                : 'MP3 · Standard (~140kbps)';
+              const cardTitle = showAdvancedCodecs
+                ? f.qualityLabel
+                : isBest
+                ? 'High Quality MP3'
+                : 'Standard MP3';
+
+              return (
+                <FormatCard
+                  key={`${f.itag}-${idx}`}
+                  selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
+                  onClick={() => selectYtFormat(f, false)}
+                  title={cardTitle}
+                  badges={[
+                    {
+                      label: badgeLabel,
+                      kind: 'accent',
+                    },
+                    showAdvancedCodecs && f.audioBitrate ? { label: `${f.audioBitrate} kbps` } : null,
+                  ]}
+                  size={fmtSize(f.sizeBytes)}
+                />
+              );
+            })}
           </div>
         </>
       )}
@@ -793,7 +1037,11 @@ function YoutubeView({
 /* ================================================================
    Instagram view
    ================================================================ */
-function InstagramView({ meta, onDownload }: any) {
+function InstagramView({ meta, onDownload, onBatchDownload }: {
+  meta: InstagramMetadata;
+  onDownload: (mediaUrl: string, defaultName: string, mediaType: MediaType) => Promise<void>;
+  onBatchDownload: (items: Array<{ downloadUrl: string; isVideo?: boolean; type?: string; id?: string }>, prefix: string) => Promise<void>;
+}) {
   if (meta.type === 'profile_pic') {
     return (
       <div className="preview" style={{ flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
@@ -805,8 +1053,8 @@ function InstagramView({ meta, onDownload }: any) {
           {meta.fullName && <p className="preview-sub">{meta.fullName}</p>}
           {meta.biography && <p className="caption" style={{ maxWidth: '30rem', textAlign: 'center' }}>{meta.biography}</p>}
           <p className="preview-sub" style={{ fontWeight: 600 }}>{Number(meta.followers).toLocaleString()} followers</p>
-          <button className="btn btn-accent" style={{ marginTop: '0.75rem' }}
-            onClick={() => onDownload(meta.downloadUrl, `pfp_${meta.username}`)}>
+          <button className="btn btn-accent preview-btn" style={{ marginTop: '0.75rem' }}
+            onClick={() => onDownload(meta.downloadUrl, `pfp_${meta.username}`, 'image')}>
             <Download size={17} /> Download HD profile picture
           </button>
         </div>
@@ -824,8 +1072,8 @@ function InstagramView({ meta, onDownload }: any) {
           <span className="eyebrow">Instagram {String(meta.type)}</span>
           {meta.username && <h2 className="preview-title">@{meta.username}</h2>}
           <p className="caption">{meta.caption || 'No caption available'}</p>
-          <button className="btn btn-accent" style={{ marginTop: '0.75rem', alignSelf: 'flex-start' }}
-            onClick={() => onDownload(meta.downloadUrl, `instagram_${meta.username || 'media'}`)}>
+          <button className="btn btn-accent preview-btn"
+            onClick={() => onDownload(meta.downloadUrl, `instagram_${meta.username || 'media'}`, meta.type as MediaType)}>
             <Download size={17} /> Download original ({meta.type})
           </button>
         </div>
@@ -840,15 +1088,21 @@ function InstagramView({ meta, onDownload }: any) {
           <div className="section-title"><InstagramIcon size={18} /> Stories for @{meta.username}</div>
           <span className="count">{meta.items?.length || 0}</span>
         </div>
+        {meta.items && meta.items.length > 1 && (
+          <button className="btn btn-primary" style={{ marginBottom: '1rem', width: '100%' }}
+            onClick={() => onBatchDownload(meta.items || [], `story_${meta.username}`)}>
+            <Download size={16} /> Save All ({meta.items.length}) Stories
+          </button>
+        )}
         <div className="stories-grid">
-          {meta.items?.map((item: any, idx: number) => (
+          {meta.items?.map((item, idx) => (
             <div className="story-card" key={`${item.id}-${idx}`}>
               <div className="story-media">
                 <img src={item.thumbnailUrl} alt="Story" />
                 {item.isVideo && <span className="story-tag">VIDEO</span>}
               </div>
               <button className="btn btn-ghost" style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                onClick={() => onDownload(item.downloadUrl, `story_${meta.username}_${item.id}`)}>
+                onClick={() => onDownload(item.downloadUrl, `story_${meta.username}_${item.id}`, item.isVideo ? 'video' : 'image')}>
                 <Download size={14} /> Save
               </button>
             </div>
@@ -869,6 +1123,12 @@ function InstagramView({ meta, onDownload }: any) {
             <span className="eyebrow">Instagram Carousel</span>
             {meta.username && <h2 className="preview-title">@{meta.username}</h2>}
             <p className="caption">{meta.caption || 'No caption available'}</p>
+            {meta.items && meta.items.length > 1 && (
+              <button className="btn btn-accent preview-btn"
+                onClick={() => onBatchDownload(meta.items || [], `instagram_${meta.username || 'carousel'}`)}>
+                <Download size={16} /> Download All ({meta.items.length}) Items
+              </button>
+            )}
           </div>
         </div>
 
@@ -877,14 +1137,14 @@ function InstagramView({ meta, onDownload }: any) {
           <span className="count">{meta.items?.length || 0} items</span>
         </div>
         <div className="stories-grid">
-          {meta.items?.map((item: any, idx: number) => (
+          {meta.items?.map((item, idx) => (
             <div className="story-card" key={idx}>
               <div className="story-media">
                 <img src={item.thumbnailUrl || item.downloadUrl} alt={`Item ${idx + 1}`} />
                 {item.type === 'video' && <span className="story-tag">VIDEO</span>}
               </div>
               <button className="btn btn-ghost" style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                onClick={() => onDownload(item.downloadUrl, `instagram_${meta.username || 'post'}_${idx + 1}`)}>
+                onClick={() => onDownload(item.downloadUrl, `instagram_${meta.username || 'post'}_${idx + 1}`, item.type as MediaType)}>
                 <Download size={14} /> Save {item.type === 'video' ? 'Video' : 'Image'}
               </button>
             </div>
@@ -900,7 +1160,10 @@ function InstagramView({ meta, onDownload }: any) {
 /* ================================================================
    Pinterest view
    ================================================================ */
-function PinterestView({ meta, onDownload }: any) {
+function PinterestView({ meta, onDownload }: {
+  meta: PinterestMetadata;
+  onDownload: (mediaUrl: string, defaultName: string, mediaType: MediaType) => Promise<void>;
+}) {
   const isPortrait = meta.type === 'image';
   return (
     <div className="preview">
@@ -911,8 +1174,8 @@ function PinterestView({ meta, onDownload }: any) {
         <span className="eyebrow">Pinterest {String(meta.type)}</span>
         <h2 className="preview-title">{meta.title}</h2>
         {meta.description && <p className="caption">{meta.description}</p>}
-        <button className="btn btn-accent" style={{ marginTop: '0.75rem', alignSelf: 'flex-start' }}
-          onClick={() => onDownload(meta.downloadUrl, 'pinterest_pin')}>
+        <button className="btn btn-accent preview-btn"
+          onClick={() => onDownload(meta.downloadUrl, 'pinterest_pin', meta.type)}>
           <Download size={17} /> Download original ({meta.type})
         </button>
       </div>
@@ -923,7 +1186,13 @@ function PinterestView({ meta, onDownload }: any) {
 /* ================================================================
    Format card
    ================================================================ */
-function FormatCard({ selected, onClick, title, badges, size }: any) {
+function FormatCard({ selected, onClick, title, badges, size }: {
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  badges: Array<Badge | null>;
+  size: string | null;
+}) {
   return (
     <button
       type="button"
@@ -934,7 +1203,7 @@ function FormatCard({ selected, onClick, title, badges, size }: any) {
       <span className="format-main">
         <span className="format-res">{title}</span>
         <span className="format-meta">
-          {badges.filter(Boolean).map((b: any, i: number) => (
+          {badges.filter((badge): badge is Badge => Boolean(badge)).map((b, i) => (
             <span key={i} className={`badge ${b.kind === 'success' ? 'badge-success' : b.kind === 'accent' ? 'badge-accent' : ''}`}
               style={{ textTransform: 'none' }}>
               {b.label}
@@ -951,7 +1220,17 @@ function FormatCard({ selected, onClick, title, badges, size }: any) {
 /* ================================================================
    Progress panel
    ================================================================ */
-function ProgressPanel({ status, progress, speed, statusText, logs, showLog, setShowLog, consoleBottomRef }: any) {
+function ProgressPanel({ status, progress, speed, statusText, logs, showLog, setShowLog, consoleBottomRef, onCancel }: {
+  status: DownloadStatus;
+  progress: number;
+  speed: number;
+  statusText: string;
+  logs: string[];
+  showLog: boolean;
+  setShowLog: React.Dispatch<React.SetStateAction<boolean>>;
+  consoleBottomRef: React.RefObject<HTMLDivElement | null>;
+  onCancel?: () => void;
+}) {
   const labelMap: Record<string, string> = {
     downloading_video: 'Downloading video…',
     downloading_audio: 'Downloading audio…',
@@ -973,7 +1252,19 @@ function ProgressPanel({ status, progress, speed, statusText, logs, showLog, set
           {status === 'handoff' && <Info size={16} />}
           {labelMap[status] || status}
         </span>
-        {isDeterminate && <span className="progress-pct">{progress}%</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {isDeterminate && <span className="progress-pct">{progress}%</span>}
+          {isDeterminate && onCancel && (
+            <button
+              className="input-action-btn"
+              onClick={onCancel}
+              title="Cancel current download"
+              style={{ color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
+            >
+              <Square size={12} fill="currentColor" /> Cancel
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bar">
@@ -990,7 +1281,7 @@ function ProgressPanel({ status, progress, speed, statusText, logs, showLog, set
 
       {logs.length > 0 && (
         <>
-          <button className="log-toggle" onClick={() => setShowLog((s: boolean) => !s)} aria-expanded={showLog}>
+          <button className="log-toggle" onClick={() => setShowLog((isShown) => !isShown)} aria-expanded={showLog}>
             <ChevronDown size={14} style={{ transform: showLog ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
             {showLog ? 'Hide' : 'Show'} technical details
           </button>
@@ -1007,12 +1298,57 @@ function ProgressPanel({ status, progress, speed, statusText, logs, showLog, set
 }
 
 /* ================================================================
+   History Panel Component
+   ================================================================ */
+function HistoryPanel({ history, onClose, onClear }: {
+  history: HistoryItem[];
+  onClose: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="settings" style={{ marginBottom: '1.5rem' }}>
+      <div className="section-head" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
+        <div className="section-title"><History size={18} /> Recent Downloads ({history.length})</div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={onClear}>
+            Clear History
+          </button>
+          <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
+      <div className="history-list">
+        {history.map((item) => (
+          <div className="history-item" key={item.id}>
+            <div>
+              <div className="history-item-title">{item.title}</div>
+              <span className="hint" style={{ fontSize: '0.75rem' }}>
+                <Clock size={11} /> {new Date(item.timestamp).toLocaleTimeString()} · {item.platform.toUpperCase()}
+              </span>
+            </div>
+            <a href={item.url} target="_blank" rel="noopener noreferrer" className="input-action-btn">
+              <Download size={13} /> Re-open
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================
    Settings panel
    ================================================================ */
 function SettingsPanel({
-  instaSessionId, saveInstaSession, youtubeCookies, saveYtCookies,
-  useLocalMerge, saveMergePref, onClose,
-}: any) {
+  useLocalMerge,
+  saveMergePref,
+  onClose,
+}: {
+  useLocalMerge: boolean;
+  saveMergePref: (value: boolean) => void;
+  onClose: () => void;
+}) {
   return (
     <div className="settings">
       <div className="section-head" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
@@ -1023,50 +1359,12 @@ function SettingsPanel({
       </div>
 
       <div className="setting">
-        <label className="setting-label">Instagram Session ID</label>
+        <label className="setting-label"><ShieldCheck size={15} /> Service authorization</label>
         <p className="setting-desc">
-          Link your account to download Stories, profile pictures, and private posts.
-          Stored only in your browser’s local storage and sent to the API on request.
+          High-quality YouTube extraction and Instagram requests use the service&apos;s server-managed authorization.
+          Visitors are never asked to paste or store account cookies in this browser.
         </p>
-        <div className="input-inline">
-          <input
-            type="password"
-            className="setting-input"
-            placeholder={instaSessionId ? '••••••••••••••••••••••••' : 'Paste sessionid cookie value'}
-            value={instaSessionId}
-            onChange={(e) => saveInstaSession(e.target.value)}
-          />
-          {instaSessionId && (
-            <button className="btn btn-danger" onClick={() => saveInstaSession('')} aria-label="Clear session ID">
-              <Trash2 size={17} />
-            </button>
-          )}
-        </div>
-        <span className="hint"><Lock size={12} /> Saved locally · overrides backend env fallback</span>
-      </div>
-
-      <div className="setting">
-        <label className="setting-label">YouTube session cookies <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span></label>
-        <p className="setting-desc">
-          Paste your YouTube cookies to download restricted / bot-blocked videos in high resolution (1080p, 4K).
-          Stored only in your browser and sent to the API dynamically.
-        </p>
-        <div className="input-inline">
-          <textarea
-            className="setting-input"
-            rows={2}
-            style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem', resize: 'vertical' }}
-            placeholder={youtubeCookies ? '••••••••••••••••••••••••' : 'Paste raw Cookie header (e.g. VISITOR_INFO1_LIVE=…; SID=…)'}
-            value={youtubeCookies}
-            onChange={(e) => saveYtCookies(e.target.value)}
-          />
-          {youtubeCookies && (
-            <button className="btn btn-danger" style={{ alignSelf: 'flex-start' }} onClick={() => saveYtCookies('')} aria-label="Clear cookies">
-              <Trash2 size={17} />
-            </button>
-          )}
-        </div>
-        <span className="hint"><Lock size={12} /> Saved locally · sent for download authorization</span>
+        <span className="hint"><Lock size={12} /> Authorization remains on the server and is never included in download URLs.</span>
       </div>
 
       <div className="setting">
@@ -1085,16 +1383,6 @@ function SettingsPanel({
         </div>
       </div>
 
-      <div className="setting">
-        <label className="setting-label"><Info size={15} /> How to find your Instagram Session ID</label>
-        <ol className="steps">
-          <li>Go to <a href="https://www.instagram.com" target="_blank" rel="noreferrer">instagram.com</a> and log in.</li>
-          <li>Right-click the page and choose <strong>Inspect</strong> to open DevTools.</li>
-          <li>Open the <strong>Application</strong> (Chrome) or <strong>Storage</strong> (Firefox) tab.</li>
-          <li>Expand <strong>Cookies</strong> → select <code>https://www.instagram.com</code>.</li>
-          <li>Find the <code>sessionid</code> cookie and copy its value.</li>
-        </ol>
-      </div>
     </div>
   );
 }
@@ -1140,21 +1428,21 @@ function TrustSection() {
             <ShieldCheck size={26} />
           </div>
           <h3>Private &amp; Secure</h3>
-          <p>No downloads are processed on our servers. Video compilations happen directly in your browser.</p>
+          <p>Authorization stays on our server. High-resolution video compilation happens in your browser by default.</p>
         </div>
         <div className="trust-card">
           <div className="trust-icon">
             <Zap size={24} />
           </div>
           <h3>High-Speed Downloads</h3>
-          <p>Direct streams with zero download limits, speed caps, or registration requirements.</p>
+          <p>Media is securely streamed through our download service with no account required from visitors.</p>
         </div>
         <div className="trust-card">
           <div className="trust-icon">
             <LockKeyhole size={24} />
           </div>
           <h3>100% Safe Connection</h3>
-          <p>Protected by SSL encryption. We do not store or track any cookies or history logs.</p>
+          <p>Protected by HTTPS. Visitor browsers do not store or send account cookies to begin a download.</p>
         </div>
       </div>
     </section>
@@ -1212,4 +1500,3 @@ function FaqSection() {
     </section>
   );
 }
-

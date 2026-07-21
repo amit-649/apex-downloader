@@ -1,9 +1,41 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { assertInstagramUrl } from '@/utils/platform-url';
+
+export const runtime = 'nodejs';
 
 // Public Instagram Web App ID (needed for Web API queries)
 const INSTAGRAM_APP_ID = '936619743392459';
+
+interface InstagramCandidate {
+  width: number;
+  height: number;
+  url: string;
+}
+
+interface InstagramVersion {
+  width: number;
+  height: number;
+  url: string;
+}
+
+interface InstagramStoryItem {
+  id: string;
+  media_type: number;
+  video_versions?: InstagramVersion[];
+  image_versions2?: { candidates?: InstagramCandidate[] };
+  taken_at?: number;
+}
+
+interface InstagramMediaItem {
+  media_type: number;
+  video_versions?: InstagramVersion[];
+  image_versions2?: { candidates?: InstagramCandidate[] };
+  carousel_media?: InstagramMediaItem[];
+  user?: { username?: string };
+  caption?: { text?: string };
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,9 +45,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Instagram URL is required' }, { status: 400 });
   }
 
-  // Retrieve Instagram Session or full Cookies from headers or backend environment variables
-  const instagramCookies = request.headers.get('X-Instagram-Cookies') || process.env.INSTAGRAM_COOKIES || '';
-  const sessionId = request.headers.get('X-Instagram-Session') || process.env.INSTAGRAM_SESSION_ID || '';
+  // Credentials are maintained only by the server environment, never supplied by visitors.
+  const instagramCookies = process.env.INSTAGRAM_COOKIES || '';
+  const sessionId = process.env.INSTAGRAM_SESSION_ID || '';
 
   // Setup request headers mimicking a real browser session
   const headers: Record<string, string> = {
@@ -31,6 +63,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    assertInstagramUrl(url);
     // 1. STORY DOWNLOAD (e.g. instagram.com/stories/username/story_id)
     if (url.includes('/stories/')) {
       if (!sessionId) {
@@ -67,10 +100,10 @@ export async function GET(request: Request) {
       }
 
       // Map active stories
-      const storyItems = userReel.items.map((item: any) => {
+      const storyItems = (userReel.items as InstagramStoryItem[]).map((item) => {
         const isVideo = item.media_type === 2;
-        const videoUrl = isVideo ? item.video_versions?.sort((a: any, b: any) => b.width - a.width)[0]?.url : null;
-        const imageUrl = item.image_versions2?.candidates?.sort((a: any, b: any) => b.width - a.width)[0]?.url;
+        const videoUrl = isVideo ? item.video_versions?.sort((a, b) => b.width - a.width)[0]?.url : null;
+        const imageUrl = item.image_versions2?.candidates?.sort((a, b) => b.width - a.width)[0]?.url;
 
         return {
           id: item.id.split('_')[0], // Extract raw story ID
@@ -83,7 +116,7 @@ export async function GET(request: Request) {
 
       // If a specific story ID was targeted, return that one
       if (targetStoryId) {
-        const targeted = storyItems.find((s: any) => s.id === targetStoryId);
+        const targeted = storyItems.find((s) => s.id === targetStoryId);
         if (targeted) {
           return NextResponse.json({
             type: 'story',
@@ -155,18 +188,18 @@ export async function GET(request: Request) {
     };
 
     // Helper: extract download data from a media object
-    const extractFromMedia = (media: any) => {
+    const extractFromMedia = (media: InstagramMediaItem | null | undefined) => {
       if (!media) return null;
 
       // Handle carousel (sidecar) posts
       if (media.carousel_media && media.carousel_media.length > 0) {
-        const items = media.carousel_media.map((item: any) => {
+        const items = media.carousel_media.map((item) => {
           const isVid = item.media_type === 2;
           return {
             type: isVid ? 'video' : 'image',
             downloadUrl: isVid
-              ? item.video_versions?.sort((a: any, b: any) => b.width - a.width)[0]?.url
-              : item.image_versions2?.candidates?.sort((a: any, b: any) => b.width - a.width)[0]?.url,
+              ? item.video_versions?.sort((a, b) => b.width - a.width)[0]?.url
+              : item.image_versions2?.candidates?.sort((a, b) => b.width - a.width)[0]?.url,
             thumbnailUrl: item.image_versions2?.candidates?.[0]?.url || '',
           };
         });
@@ -182,8 +215,8 @@ export async function GET(request: Request) {
 
       const isVideo = media.media_type === 2;
       const downloadUrl = isVideo
-        ? media.video_versions?.sort((a: any, b: any) => b.width - a.width)[0]?.url
-        : media.image_versions2?.candidates?.sort((a: any, b: any) => b.width - a.width)[0]?.url;
+        ? media.video_versions?.sort((a, b) => b.width - a.width)[0]?.url
+        : media.image_versions2?.candidates?.sort((a, b) => b.width - a.width)[0]?.url;
 
       return {
         type: isVideo ? 'video' : 'image',
@@ -199,13 +232,14 @@ export async function GET(request: Request) {
       const mediaId = shortcodeToMediaId(shortcode);
       const mediaInfoUrl = `https://www.instagram.com/api/v1/media/${mediaId}/info/`;
       const apiRes = await axios.get(mediaInfoUrl, { headers, timeout: 8000 });
-      const media = apiRes.data?.items?.[0];
+      const media = apiRes.data?.items?.[0] as InstagramMediaItem | undefined;
       const result = extractFromMedia(media);
       if (result?.downloadUrl) {
         return NextResponse.json(result);
       }
-    } catch (e: any) {
-      console.warn('Method A (/api/v1/media/info) failed:', e.response?.status || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number }; message?: string };
+      console.warn('Method A (/api/v1/media/info) failed:', err.response?.status || err.message);
     }
 
     // Method B: GraphQL query with shortcode
@@ -215,7 +249,7 @@ export async function GET(request: Request) {
       const gqlMedia = gqlRes.data?.data?.shortcode_media;
 
       if (gqlMedia) {
-        const isVideo = gqlMedia.is_video;
+        const isVideo = Boolean(gqlMedia.is_video);
         const downloadUrl = isVideo ? gqlMedia.video_url : gqlMedia.display_url;
 
         if (downloadUrl) {
@@ -228,21 +262,23 @@ export async function GET(request: Request) {
           });
         }
       }
-    } catch (e: any) {
-      console.warn('Method B (GraphQL) failed:', e.response?.status || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number }; message?: string };
+      console.warn('Method B (GraphQL) failed:', err.response?.status || err.message);
     }
 
     // Method C: Legacy __a=1 endpoint
     try {
       const apiInfoUrl = `https://www.instagram.com/p/${shortcode}/?__a=1&__d=dis`;
       const apiRes = await axios.get(apiInfoUrl, { headers, timeout: 5000 });
-      const media = apiRes.data?.items?.[0];
+      const media = apiRes.data?.items?.[0] as InstagramMediaItem | undefined;
       const result = extractFromMedia(media);
       if (result?.downloadUrl) {
         return NextResponse.json(result);
       }
-    } catch (e: any) {
-      console.warn('Method C (__a=1) failed:', e.response?.status || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number }; message?: string };
+      console.warn('Method C (__a=1) failed:', err.response?.status || err.message);
     }
 
     // Method D: HTML OG tag scraping (last resort)
@@ -261,8 +297,9 @@ export async function GET(request: Request) {
       if (ogImage) {
         return NextResponse.json({ type: 'image', caption: ogTitle, downloadUrl: ogImage, thumbnailUrl: ogImage });
       }
-    } catch (e: any) {
-      console.warn('Method D (OG scraping) failed:', e.response?.status || e.message);
+    } catch (e: unknown) {
+      const err = e as { response?: { status?: number }; message?: string };
+      console.warn('Method D (OG scraping) failed:', err.response?.status || err.message);
     }
 
     // All methods failed
@@ -270,8 +307,9 @@ export async function GET(request: Request) {
       error: 'Could not extract download URL. All extraction methods failed. Make sure: (1) the post/reel is public, (2) the URL is valid, and (3) your Instagram session cookie is fresh.'
     }, { status: 404 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error handling Instagram request:', error);
-    return NextResponse.json({ error: error.message || 'Instagram extraction failed' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Instagram extraction failed';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

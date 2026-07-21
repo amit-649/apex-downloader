@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint src",
     "sync": "node scripts/sync_cookies.js",
     "stop-chrome": "taskkill /IM chrome.exe /F || exit 0"
   },

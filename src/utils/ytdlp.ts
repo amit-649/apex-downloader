@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
@@ -77,57 +77,46 @@ function getExecutable(): string {
   return 'yt-dlp'; // Fallback to global
 }
 
-function runYtDlp(args: string): Promise<any> {
+function runYtDlp(args: string[]): Promise<YtDlpInfo> {
   return new Promise((resolve, reject) => {
     const exe = getExecutable();
-    const cmd = `"${exe}" --dump-json --no-warnings --no-playlist ${args}`;
-    exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(exe, ['--dump-json', '--no-warnings', '--no-playlist', ...args], { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
         return reject(new Error(stderr.trim() || error.message));
       }
       try {
-        resolve(JSON.parse(stdout));
-      } catch (err: any) {
-        reject(new Error('Failed to parse JSON: ' + err.message));
+        resolve(JSON.parse(stdout) as YtDlpInfo);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown JSON parsing error';
+        reject(new Error(`Failed to parse JSON: ${message}`));
       }
     });
   });
 }
 
-export async function getInfo(url: string, cookies?: string): Promise<YtDlpInfo> {
-  const safeUrl = url.replace(/"/g, '\\"');
-  let cookiesArg = '';
-
-  if (cookies) {
-    // Priority 1: Cookies passed explicitly from the client request
-    const safeCookie = cookies.replace(/"/g, '\\"');
-    cookiesArg = `--add-header "Cookie:${safeCookie}"`;
-  } else {
-    // Priority 2: cookies.txt file on disk (local dev)
-    const cookiesPath = getCookiesFilePath();
-    if (cookiesPath) {
-      cookiesArg = `--cookies "${cookiesPath}"`;
-    } else if (process.env.YOUTUBE_COOKIES) {
-      // Priority 3: YOUTUBE_COOKIES env var (Vercel / hosted deployments)
-      const envCookie = process.env.YOUTUBE_COOKIES.replace(/"/g, '\\"');
-      cookiesArg = `--add-header "Cookie:${envCookie}"`;
-    }
-  }
+export async function getInfo(url: string): Promise<YtDlpInfo> {
+  const cookiesPath = getCookiesFilePath();
+  const cookieArgs = cookiesPath
+    ? ['--cookies', cookiesPath]
+    : process.env.YOUTUBE_COOKIES
+      ? ['--add-header', `Cookie:${process.env.YOUTUBE_COOKIES}`]
+      : [];
 
   try {
     // Attempt 1: Standard client + Node JS runtime
-    const data = await runYtDlp(`${cookiesArg} --js-runtimes node "${safeUrl}"`);
+    const data = await runYtDlp([...cookieArgs, '--js-runtimes', 'node', url]);
     return { ...data, is_restricted: false };
-  } catch (error: any) {
-    const errMsg = error.message;
-    // If it is a bot-protection block, and we are not already using cookies, fall back to android client
-    if (!cookies && !cookiesArg.includes('--cookies') && (errMsg.includes('confirm') && errMsg.includes('bot'))) {
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : '';
+    // If it is a bot-protection block without any server-managed cookies, fall back to android client.
+    if (cookieArgs.length === 0 && errMsg.includes('confirm') && errMsg.includes('bot')) {
       console.warn('⚠️ Standard yt-dlp check failed with bot verification trigger. Falling back to android client...');
       try {
-        const data = await runYtDlp(`--extractor-args "youtube:player_client=android" "${safeUrl}"`);
+        const data = await runYtDlp(['--extractor-args', 'youtube:player_client=android', url]);
         return { ...data, is_restricted: true };
-      } catch (fallbackErr: any) {
-        throw new Error('Both standard and fallback extraction failed: ' + fallbackErr.message);
+      } catch (fallbackError: unknown) {
+        const message = fallbackError instanceof Error ? fallbackError.message : 'Unknown extraction error';
+        throw new Error(`Both standard and fallback extraction failed: ${message}`);
       }
     }
     throw error;
