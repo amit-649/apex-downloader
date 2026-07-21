@@ -69,7 +69,7 @@ async function proxyMedia(streamUrl: string, range: string | null): Promise<Resp
     headers,
     responseType: 'stream',
     timeout: 30_000,
-    maxRedirects: 0,
+    maxRedirects: 5,
     decompress: false,
     validateStatus: (status) => status >= 200 && status < 300,
   });
@@ -218,7 +218,7 @@ export async function GET(request: Request) {
       headers: BROWSER_HEADERS,
       responseType: 'stream',
       timeout: 30_000,
-      maxRedirects: 0,
+      maxRedirects: 5,
       decompress: false,
       validateStatus: (status) => status >= 200 && status < 300,
     });

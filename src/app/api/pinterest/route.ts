@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     const response = await axios.get(pinterestUrl.toString(), {
       headers,
       timeout: 8000,
-      maxRedirects: 0,
+      maxRedirects: 5,
     });
     const html = response.data;
     const $ = cheerio.load(html);
