@@ -64,6 +64,22 @@ export async function GET(request: Request) {
 
   try {
     assertInstagramUrl(url);
+
+    // Optional proxy to Railway VPS backend if configured
+    if (process.env.RAILWAY_API_URL) {
+      try {
+        const railwayUrl = `${process.env.RAILWAY_API_URL.replace(/\/$/, '')}/api/instagram?url=${encodeURIComponent(url)}`;
+        const proxyRes = await fetch(railwayUrl, { headers: { 'Accept': 'application/json' } });
+        if (proxyRes.ok) {
+          const data = await proxyRes.json();
+          if (data && !data.error) {
+            return NextResponse.json(data);
+          }
+        }
+      } catch (e) {
+        console.warn('Railway proxy attempt failed for Instagram, falling back to local extraction:', e);
+      }
+    }
     // 1. STORY DOWNLOAD (e.g. instagram.com/stories/username/story_id)
     if (url.includes('/stories/')) {
       if (!sessionId) {

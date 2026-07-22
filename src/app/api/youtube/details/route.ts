@@ -25,6 +25,23 @@ export async function GET(request: Request) {
 
   try {
     const youtubeUrl = assertYoutubeUrl(url);
+
+    // Optional proxy to Railway VPS backend if configured
+    if (process.env.RAILWAY_API_URL) {
+      try {
+        const railwayUrl = `${process.env.RAILWAY_API_URL.replace(/\/$/, '')}/api/youtube/details?url=${encodeURIComponent(youtubeUrl.toString())}`;
+        const proxyRes = await fetch(railwayUrl, { headers: { 'Accept': 'application/json' } });
+        if (proxyRes.ok) {
+          const data = await proxyRes.json();
+          if (data && !data.error) {
+            return NextResponse.json(data);
+          }
+        }
+      } catch (e) {
+        console.warn('Railway proxy attempt failed, falling back to local extraction:', e);
+      }
+    }
+
     const info = await getInfo(youtubeUrl.toString());
 
     // Map formats
