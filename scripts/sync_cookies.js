@@ -149,6 +149,19 @@ async function extractInstagram(browser) {
 // ============================================================
 // Vercel CLI Integrator
 // ============================================================
+function syncToRailway(key, value) {
+  return new Promise((resolve) => {
+    console.log(`🚂 Syncing ${key} to Railway production...`);
+    try {
+      execSync(`railway variables set ${key}="${value.replace(/"/g, '\\"')}"`, { stdio: 'ignore', shell: true });
+      console.log(`  ✅ Successfully updated ${key} on Railway!`);
+    } catch (e) {
+      console.log(`  ℹ️  Railway CLI sync skipped (if Vercel Integration is linked in Railway, it syncs automatically).`);
+    }
+    resolve();
+  });
+}
+
 function syncToVercel(key, value) {
   return new Promise((resolve) => {
     console.log(`☁️  Syncing ${key} to Vercel production...`);
@@ -318,19 +331,22 @@ async function run() {
     }
   }
 
-  // --- STEP 3: Vercel Push ---
+  // --- STEP 3: Vercel & Railway Push ---
   let hasSyncedAny = false;
 
   if (runYt && ytCookies) {
     await syncToVercel('YOUTUBE_COOKIES', ytCookies);
+    await syncToRailway('YOUTUBE_COOKIES', ytCookies);
     hasSyncedAny = true;
   }
   if (runIg && igSession) {
     const sessionIdOnly = igSession.split('; ').find(c => c.startsWith('sessionid='))?.split('=')[1] || '';
     if (sessionIdOnly) {
       await syncToVercel('INSTAGRAM_SESSION_ID', sessionIdOnly);
+      await syncToRailway('INSTAGRAM_SESSION_ID', sessionIdOnly);
     }
     await syncToVercel('INSTAGRAM_COOKIES', igSession);
+    await syncToRailway('INSTAGRAM_COOKIES', igSession);
     hasSyncedAny = true;
   }
 
