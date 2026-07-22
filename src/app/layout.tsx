@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
+const DOMAIN = process.env.NEXT_PUBLIC_SITE_URL || "https://downloader.amitcodes.in";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://downloader.amitcodes.in"),
+  metadataBase: new URL(DOMAIN),
   title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
   description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
   keywords: [
@@ -19,12 +21,12 @@ export const metadata: Metadata = {
     "instagram carousel downloader",
   ],
   alternates: {
-    canonical: "https://downloader.amitcodes.in",
+    canonical: DOMAIN,
   },
   openGraph: {
     title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
     description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
-    url: "https://downloader.amitcodes.in",
+    url: DOMAIN,
     siteName: "ApexDownloader",
     images: [
       {
@@ -51,7 +53,6 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -71,8 +72,8 @@ export default function RootLayout({
               "@type": "WebSite",
               "name": "ApexDownloader",
               "alternateName": "Apex Downloader",
-              "url": "https://downloader.amitcodes.in"
-            })
+              "url": DOMAIN,
+            }),
           }}
         />
       </head>
@@ -83,4 +84,3 @@ export default function RootLayout({
     </html>
   );
 }
-

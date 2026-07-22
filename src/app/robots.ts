@@ -5,8 +5,11 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/api/'], // Disallow crawling of api paths to keep them private
+      disallow: ['/api/'],
     },
-    sitemap: 'https://downloader.amitcodes.in/sitemap.xml',
+    sitemap: [
+      'https://downloader.amitcodes.in/sitemap.xml',
+      'https://apexdown.vercel.app/sitemap.xml',
+    ],
   };
 }
