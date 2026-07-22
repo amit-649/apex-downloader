@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://downloader.amitcodes.in"),
   title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
   description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
   keywords: [
@@ -18,12 +19,12 @@ export const metadata: Metadata = {
     "instagram carousel downloader",
   ],
   alternates: {
-    canonical: "https://apexdown.vercel.app",
+    canonical: "https://downloader.amitcodes.in",
   },
   openGraph: {
     title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
     description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
-    url: "https://apexdown.vercel.app",
+    url: "https://downloader.amitcodes.in",
     siteName: "ApexDownloader",
     images: [
       {
@@ -70,7 +71,7 @@ export default function RootLayout({
               "@type": "WebSite",
               "name": "ApexDownloader",
               "alternateName": "Apex Downloader",
-              "url": "https://apexdown.vercel.app"
+              "url": "https://downloader.amitcodes.in"
             })
           }}
         />
