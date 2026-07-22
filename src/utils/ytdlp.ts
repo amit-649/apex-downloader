@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { getAutoYouTubeTokens } from '@/utils/yt-potoken';
 
 export interface YtDlpFormat {
   format_id: string;
@@ -116,9 +117,15 @@ export async function getInfo(url: string): Promise<YtDlpInfo> {
   const cookiesPath = getCookiesFilePath();
   const cookieArgs = cookiesPath ? ['--cookies', cookiesPath] : [];
 
+  // Automatically fetch / load fresh Visitor Data & PO Tokens for 100% automated extraction
+  const autoTokens = await getAutoYouTubeTokens();
+  const tokenExtractorArgs = autoTokens.visitorData
+    ? ['--extractor-args', `youtube:visitor_data=${autoTokens.visitorData}`]
+    : [];
+
   try {
-    // Attempt 1: Standard client + cookies + Node JS runtime
-    const data = await runYtDlp([...cookieArgs, '--js-runtimes', 'node', url]);
+    // Attempt 1: Standard client + cookies + auto Visitor Tokens + Node JS runtime
+    const data = await runYtDlp([...cookieArgs, ...tokenExtractorArgs, '--js-runtimes', 'node', url]);
     return { ...data, is_restricted: false };
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : '';
@@ -127,13 +134,13 @@ export async function getInfo(url: string): Promise<YtDlpInfo> {
     // Attempt 2: Rotate player clients (ios, android, web) to bypass bot verification
     try {
       console.warn('🔄 Retrying with rotated iOS player client...');
-      const data = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web', url]);
+      const data = await runYtDlp([...cookieArgs, ...tokenExtractorArgs, '--extractor-args', 'youtube:player_client=ios,android,web', url]);
       return { ...data, is_restricted: true };
     } catch (fallbackError: unknown) {
       // Attempt 3: Try TV client
       try {
         console.warn('🔄 Retrying with TV embedded player client...');
-        const data = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=tv,mweb', url]);
+        const data = await runYtDlp([...cookieArgs, ...tokenExtractorArgs, '--extractor-args', 'youtube:player_client=tv,mweb', url]);
         return { ...data, is_restricted: true };
       } catch (finalErr: unknown) {
         const message = finalErr instanceof Error ? finalErr.message : 'Unknown extraction error';
