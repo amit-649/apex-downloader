@@ -547,16 +547,16 @@ export default function Home() {
       logToConsole('Loading single-threaded FFmpeg.wasm core (no-COOP/COEP mode)...');
 
       const mergedBlob = await mergeVideoAndAudio(
-        videoBlob,
-        audioBlob,
-        `${cleanTitle}.mp4`,
-        (percent) => {
+        selectedVideoFormat.url,
+        selectedAudioFormat.url,
+        videoSizeBytes,
+        audioSizeBytes,
+        (statusMsg: string, percent: number, speed: number) => {
           setDownloadProgress(percent);
-          setStatusText(`FFmpeg Merging tracks: ${percent}%`);
+          setStatusText(statusMsg);
+          if (speed > 0) setDownloadSpeed(speed);
         },
-        (ffmpegLog) => {
-          logToConsole(`[FFmpeg] ${ffmpegLog}`);
-        }
+        abortController.signal
       );
 
       logToConsole('FFmpeg merge complete. Packaging output file.');
