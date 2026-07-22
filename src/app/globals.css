@@ -1,7 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
-
 :root {
-  --font-outfit: 'Outfit', sans-serif;
+  --font-outfit: var(--font-outfit), 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --bg-gradient: radial-gradient(circle at top, #15133c 0%, #030308 100%);
   --card-bg: rgba(10, 10, 22, 0.65);
   --card-border: rgba(255, 255, 255, 0.08);
