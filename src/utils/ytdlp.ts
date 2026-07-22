@@ -35,9 +35,6 @@ export function getCookiesFilePath(): string | null {
   ];
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
-      // On Vercel (Linux), the project dir is read-only.
-      // yt-dlp tries to write back to the cookies file after reading it,
-      // so we must copy it to the writable /tmp directory first.
       if (process.platform !== 'win32') {
         const tmpCookies = '/tmp/cookies.txt';
         try {
@@ -50,6 +47,28 @@ export function getCookiesFilePath(): string | null {
       return p;
     }
   }
+
+  // Auto-generate Netscape cookies file from process.env.YOUTUBE_COOKIES on Linux/Vercel/Railway
+  if (process.env.YOUTUBE_COOKIES) {
+    const tmpEnvCookies = process.platform !== 'win32' ? '/tmp/env_youtube_cookies.txt' : path.join(process.cwd(), 'env_yt_cookies.txt');
+    try {
+      let netscapeOutput = '# Netscape HTTP Cookie File\n# Generated from YOUTUBE_COOKIES env\n\n';
+      const pairs = process.env.YOUTUBE_COOKIES.split(';');
+      for (const pair of pairs) {
+        const idx = pair.indexOf('=');
+        if (idx > 0) {
+          const key = pair.substring(0, idx).trim();
+          const val = pair.substring(idx + 1).trim();
+          netscapeOutput += `.youtube.com\tTRUE\t/\tTRUE\t0\t${key}\t${val}\n`;
+        }
+      }
+      fs.writeFileSync(tmpEnvCookies, netscapeOutput, 'utf8');
+      return tmpEnvCookies;
+    } catch (e) {
+      console.error('Failed to write YOUTUBE_COOKIES to Netscape file:', e);
+    }
+  }
+
   return null;
 }
 
@@ -62,7 +81,6 @@ function getExecutable(): string {
   if (fs.existsSync(localPath)) {
     const tempPath = '/tmp/yt-dlp';
     try {
-      // On Vercel, copy read-only binary to writable /tmp so we can mark it executable (chmod +x)
       if (!fs.existsSync(tempPath)) {
         fs.copyFileSync(localPath, tempPath);
       }
@@ -96,29 +114,31 @@ function runYtDlp(args: string[]): Promise<YtDlpInfo> {
 
 export async function getInfo(url: string): Promise<YtDlpInfo> {
   const cookiesPath = getCookiesFilePath();
-  const cookieArgs = cookiesPath
-    ? ['--cookies', cookiesPath]
-    : process.env.YOUTUBE_COOKIES
-      ? ['--add-header', `Cookie:${process.env.YOUTUBE_COOKIES}`]
-      : [];
+  const cookieArgs = cookiesPath ? ['--cookies', cookiesPath] : [];
 
   try {
-    // Attempt 1: Standard client + Node JS runtime
+    // Attempt 1: Standard client + cookies + Node JS runtime
     const data = await runYtDlp([...cookieArgs, '--js-runtimes', 'node', url]);
     return { ...data, is_restricted: false };
   } catch (error: unknown) {
     const errMsg = error instanceof Error ? error.message : '';
-    // If it is a bot-protection block without any server-managed cookies, fall back to android client.
-    if (cookieArgs.length === 0 && errMsg.includes('confirm') && errMsg.includes('bot')) {
-      console.warn('⚠️ Standard yt-dlp check failed with bot verification trigger. Falling back to android client...');
+    console.warn('⚠️ Standard yt-dlp check failed:', errMsg);
+
+    // Attempt 2: Rotate player clients (ios, android, web) to bypass bot verification
+    try {
+      console.warn('🔄 Retrying with rotated iOS player client...');
+      const data = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web', url]);
+      return { ...data, is_restricted: true };
+    } catch (fallbackError: unknown) {
+      // Attempt 3: Try TV client
       try {
-        const data = await runYtDlp(['--extractor-args', 'youtube:player_client=android', url]);
+        console.warn('🔄 Retrying with TV embedded player client...');
+        const data = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=tv,mweb', url]);
         return { ...data, is_restricted: true };
-      } catch (fallbackError: unknown) {
-        const message = fallbackError instanceof Error ? fallbackError.message : 'Unknown extraction error';
-        throw new Error(`Both standard and fallback extraction failed: ${message}`);
+      } catch (finalErr: unknown) {
+        const message = finalErr instanceof Error ? finalErr.message : 'Unknown extraction error';
+        throw new Error(`YouTube extraction failed: ${message}`);
       }
     }
-    throw error;
   }
 }
