@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getInfo } from '@/utils/ytdlp';
 import { assertMediaUrl, assertYoutubeUrl } from '@/utils/platform-url';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
-import ffmpeg from 'fluent-ffmpeg';
 import { PassThrough, Readable } from 'stream';
 import axios from 'axios';
 
@@ -13,11 +11,17 @@ const BROWSER_HEADERS = {
   'Accept-Language': 'en-US,en;q=0.9',
 };
 
-// Configure local FFmpeg path.
+// Safe dynamic loader for native FFmpeg binary to prevent Turbopack build errors on Vercel
+let ffmpeg: any = null;
 try {
-  ffmpeg.setFfmpegPath(ffmpegPath.path);
-} catch (error) {
-  console.warn('Could not configure local FFmpeg; server-side merge will be unavailable:', error);
+  const req = typeof eval !== 'undefined' ? eval('require') : require;
+  ffmpeg = req('fluent-ffmpeg');
+  const ffmpegInstaller = req('@ffmpeg-installer/ffmpeg');
+  if (ffmpegInstaller?.path) {
+    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+  }
+} catch (e) {
+  console.warn('Local server FFmpeg binary unavailable (browser WebAssembly or Railway proxy will handle merges):', e);
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -29,39 +33,48 @@ function safeFilename(value: string, fallback: string): string {
   return filename || fallback;
 }
 
-function isSafeFormatId(value: string): boolean {
-  return /^[a-zA-Z0-9._-]{1,32}$/.test(value);
+function isSafeFormatId(formatId: string): boolean {
+  return /^[a-zA-Z0-9_-]{1,32}$/.test(formatId);
 }
 
-function getSafeRange(value: string | null): string | undefined {
-  if (!value || !/^bytes=\d+-\d*$/.test(value)) return undefined;
-  return value;
-}
-
-function toWebStream(stream: Readable): ReadableStream<Uint8Array> {
-  return Readable.toWeb(stream) as ReadableStream<Uint8Array>;
-}
-
-function createProxyResponse(stream: Readable, status: number, sourceHeaders: Record<string, unknown>): Response {
-  const headers = new Headers({
-    'Content-Type': String(sourceHeaders['content-type'] || 'application/octet-stream'),
-    'Accept-Ranges': 'bytes',
-    'Cache-Control': 'private, no-store',
+function toWebStream(nodeStream: Readable): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      nodeStream.on('data', (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+      nodeStream.on('end', () => controller.close());
+      nodeStream.on('error', (err: Error) => controller.error(err));
+    },
+    cancel() {
+      nodeStream.destroy();
+    },
   });
+}
 
-  for (const header of ['content-range', 'content-length']) {
-    const value = sourceHeaders[header];
-    if (value) headers.set(header, String(value));
+function createProxyResponse(
+  stream: Readable,
+  status = 200,
+  headers: Record<string, unknown> = {},
+): Response {
+  const responseHeaders = new Headers();
+  const allowedHeaders = ['content-type', 'content-length', 'accept-ranges', 'content-range'];
+
+  for (const [key, val] of Object.entries(headers)) {
+    if (allowedHeaders.includes(key.toLowerCase()) && val !== undefined) {
+      responseHeaders.set(key, String(val));
+    }
   }
 
-  return new Response(toWebStream(stream), { status, headers });
+  responseHeaders.set('Cache-Control', 'private, no-store');
+  return new Response(toWebStream(stream), { status, headers: responseHeaders });
 }
 
-async function proxyMedia(streamUrl: string, range: string | null): Promise<Response> {
-  const mediaUrl = assertMediaUrl(streamUrl);
-  const safeRange = getSafeRange(range);
+async function proxyMedia(targetUrl: string, rangeHeader?: string | null): Promise<Response> {
+  const mediaUrl = assertMediaUrl(targetUrl);
   const headers: Record<string, string> = { ...BROWSER_HEADERS };
-  if (safeRange) headers.Range = safeRange;
+
+  if (rangeHeader) {
+    headers['Range'] = rangeHeader;
+  }
 
   const response = await axios({
     url: mediaUrl.toString(),
@@ -85,7 +98,10 @@ async function proxyMedia(streamUrl: string, range: string | null): Promise<Resp
   return createProxyResponse(passThrough, response.status, response.headers as Record<string, unknown>);
 }
 
-function startMerge(videoUrl: string, audioUrl: string): { output: PassThrough; command: ReturnType<typeof ffmpeg> } {
+function startMerge(videoUrl: string, audioUrl: string): { output: PassThrough } {
+  if (!ffmpeg) {
+    throw new Error('Server-side FFmpeg is not installed on this environment. Use client-side WebAssembly merge.');
+  }
   const output = new PassThrough();
   const command = ffmpeg()
     .input(videoUrl)
@@ -98,37 +114,38 @@ function startMerge(videoUrl: string, audioUrl: string): { output: PassThrough; 
     .outputOptions('-map 0:v:0')
     .outputOptions('-map 1:a:0')
     .outputOptions('-shortest')
-    .on('error', (error) => {
+    .on('error', (error: unknown) => {
       console.error('FFmpeg merge error:', error);
-      output.destroy(error);
+      output.destroy(error instanceof Error ? error : new Error(String(error)));
     });
 
   command.stream(output);
-  return { output, command };
+  return { output };
 }
 
-function startAudioTranscode(sourceUrl: string): { output: PassThrough; command: ReturnType<typeof ffmpeg> } {
+function startAudioTranscode(sourceUrl: string): { output: PassThrough } {
+  if (!ffmpeg) {
+    throw new Error('Server-side FFmpeg is not installed on this environment.');
+  }
   const output = new PassThrough();
   const command = ffmpeg(sourceUrl)
     .inputOptions('-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`)
     .audioCodec('libmp3lame')
     .audioBitrate(192)
     .format('mp3')
-    .on('error', (error) => {
+    .on('error', (error: unknown) => {
       console.error('FFmpeg audio transcode error:', error);
-      output.destroy(error);
+      output.destroy(error instanceof Error ? error : new Error(String(error)));
     });
 
   command.stream(output);
-  return { output, command };
+  return { output };
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action');
 
-  // Proxy only known platform CDNs. This endpoint deliberately never accepts
-  // credentials from the browser; platform authorization stays in server env vars.
   if (action === 'proxy') {
     const streamUrl = searchParams.get('streamUrl');
     if (!streamUrl) {
@@ -202,14 +219,18 @@ export async function GET(request: Request) {
     const filename = safeFilename(title, 'download');
 
     if (formatIsAudio && wantsMp3) {
-      const { output } = startAudioTranscode(assertMediaUrl(format.url).toString());
-      return new Response(toWebStream(output), {
-        headers: {
-          'Content-Type': 'audio/mpeg',
-          'Content-Disposition': `attachment; filename="${filename}.mp3"`,
-          'Cache-Control': 'private, no-store',
-        },
-      });
+      try {
+        const { output } = startAudioTranscode(assertMediaUrl(format.url).toString());
+        return new Response(toWebStream(output), {
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'Content-Disposition': `attachment; filename="${filename}.mp3"`,
+            'Cache-Control': 'private, no-store',
+          },
+        });
+      } catch {
+        // Fallback to direct stream if server ffmpeg unavailable
+      }
     }
 
     const response = await axios({
