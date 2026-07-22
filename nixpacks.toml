@@ -1,11 +1,12 @@
 [providers]
 providers = ["node"]
 
+[variables]
+PUPPETEER_SKIP_DOWNLOAD = "true"
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+
 [phases.setup]
 nixPkgs = ["nodejs_20", "ffmpeg"]
-
-[phases.install]
-cmds = ["npm ci --omit=dev"]
 
 [phases.build]
 cmds = ["npm run build"]
