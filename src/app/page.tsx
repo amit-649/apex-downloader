@@ -473,43 +473,6 @@ export default function Home() {
       logToConsole('Starting client-side range-based video chunk proxy...');
       logToConsole(`Video format: ${selectedVideoFormat.qualityLabel} | Size: ${videoSizeBytes > 0 ? (videoSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
 
-      await downloadInChunks(
-        selectedVideoFormat.url,
-        videoSizeBytes,
-        (percent, speed) => {
-          setDownloadProgress(Math.round(percent));
-          setDownloadSpeed(speed);
-          setStatusText(`Downloading video stream: ${Math.round(percent)}%`);
-        },
-        abortController.signal
-      );
-
-      logToConsole('Video stream chunks download complete.');
-
-      setDownloadStatus('downloading_audio');
-      setDownloadProgress(0);
-      setStatusText('Downloading audio stream in chunks...');
-      logToConsole('Starting client-side range-based audio chunk proxy...');
-      logToConsole(`Audio format: ${selectedAudioFormat.qualityLabel} | Size: ${audioSizeBytes > 0 ? (audioSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
-
-      await downloadInChunks(
-        selectedAudioFormat.url,
-        audioSizeBytes,
-        (percent, speed) => {
-          setDownloadProgress(Math.round(percent));
-          setDownloadSpeed(speed);
-          setStatusText(`Downloading audio stream: ${Math.round(percent)}%`);
-        },
-        abortController.signal
-      );
-
-      logToConsole('Audio stream chunks download complete.');
-
-      setDownloadStatus('merging');
-      setDownloadProgress(0);
-      setStatusText('Initializing FFmpeg WebAssembly...');
-      logToConsole('Loading single-threaded FFmpeg.wasm core (no-COOP/COEP mode)...');
-
       const mergedBlob = await mergeVideoAndAudio(
         selectedVideoFormat.url,
         selectedAudioFormat.url,
