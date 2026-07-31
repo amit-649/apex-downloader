@@ -466,30 +466,12 @@ export default function Home() {
       }
       setDownloadStatus('handoff');
       setStatusText('Connecting to high-speed live stream merger...');
-      logToConsole(`Requesting live stream merge from ${mergerBaseUrl}...`);
+      logToConsole(`Requesting live stream merge via proxy...`);
 
       try {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `${mergerBaseUrl.replace(/\/$/, '')}/api/merge`;
-        form.target = '_self';
-
-        const addField = (name: string, val: string) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = name;
-          input.value = val;
-          form.appendChild(input);
-        };
-
-        addField('videoUrl', selectedVideoFormat.url);
-        addField('audioUrl', selectedAudioFormat.url);
-        addField('title', cleanTitle);
-
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-
+        // Use same-origin Vercel proxy which forwards to Render via POST internally
+        const proxyUrl = `/api/youtube/merge-proxy?videoUrl=${encodeURIComponent(selectedVideoFormat.url)}&audioUrl=${encodeURIComponent(selectedAudioFormat.url)}&title=${encodeURIComponent(cleanTitle)}`;
+        window.location.href = proxyUrl;
         logToConsole('Live stream pipe initiated. File download starting in browser!');
         addToHistory(title, 'youtube', sourceUrl);
       } catch (error: unknown) {

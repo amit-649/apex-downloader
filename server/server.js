@@ -107,34 +107,14 @@ app.get('/health', (req, res) => {
 
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
 app.all('/api/merge', async (req, res) => {
-  let videoUrl = req.body?.videoUrl || req.query?.videoUrl;
-  let audioUrl = req.body?.audioUrl || req.query?.audioUrl;
+  const videoUrl = req.body?.videoUrl || req.query?.videoUrl;
+  const audioUrl = req.body?.audioUrl || req.query?.audioUrl;
   const title = req.body?.title || req.query?.title;
 
-  // Fallback: extract full URLs from raw request string if query splitting truncated & params
-  if (!videoUrl || !audioUrl || !videoUrl.includes('http')) {
-    const rawUrl = req.url;
-    const vIdx = rawUrl.indexOf('videoUrl=');
-    const aIdx = rawUrl.indexOf('audioUrl=');
-
-    if (vIdx !== -1 && aIdx !== -1) {
-      try {
-        if (vIdx < aIdx) {
-          videoUrl = decodeURIComponent(rawUrl.substring(vIdx + 9, aIdx - 1));
-          const tIdx = rawUrl.indexOf('&title=', aIdx);
-          audioUrl = decodeURIComponent(rawUrl.substring(aIdx + 9, tIdx !== -1 ? tIdx : rawUrl.length));
-        } else {
-          audioUrl = decodeURIComponent(rawUrl.substring(aIdx + 9, vIdx - 1));
-          const tIdx = rawUrl.indexOf('&title=', vIdx);
-          videoUrl = decodeURIComponent(rawUrl.substring(vIdx + 9, tIdx !== -1 ? tIdx : rawUrl.length));
-        }
-      } catch (e) {
-        console.warn('[Merger] Raw URL parsing warning:', e.message);
-      }
-    }
-  }
+  console.log(`[Merger] Received merge request — method: ${req.method}, hasBody: ${!!req.body}, videoUrl present: ${!!videoUrl}, audioUrl present: ${!!audioUrl}`);
 
   if (!videoUrl || !audioUrl) {
+    console.error('[Merger] Missing URLs. Body:', JSON.stringify(req.body), 'Query:', JSON.stringify(req.query));
     return res.status(400).json({ error: 'videoUrl and audioUrl parameters are required.' });
   }
 
