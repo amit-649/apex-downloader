@@ -116,7 +116,6 @@ function startMerge(videoUrl: string, audioUrl: string): { output: PassThrough }
     .format('mp4')
     .outputOptions('-map 0:v:0')
     .outputOptions('-map 1:a:0')
-    .outputOptions('-shortest')
     .on('error', (error: unknown) => {
       console.error('FFmpeg merge error:', error);
       output.destroy(error instanceof Error ? error : new Error(String(error)));

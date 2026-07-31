@@ -228,14 +228,14 @@ app.all('/api/merge', async (req, res) => {
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '5',
+        '-reconnect_delay_max', '10',
       ])
       .input(finalAudioUrl)
       .inputOptions([
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '5',
+        '-reconnect_delay_max', '10',
       ])
       .videoCodec('copy')
       .audioCodec('aac')
@@ -243,7 +243,6 @@ app.all('/api/merge', async (req, res) => {
       .outputOptions([
         '-map', '0:v:0',
         '-map', '1:a:0',
-        '-shortest',
         '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
       ])
       .on('start', (cmd) => {
