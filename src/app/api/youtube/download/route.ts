@@ -180,22 +180,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Video or audio format URL not found.' }, { status: 404 });
       }
 
-      // Proxy to Railway VPS backend if local native FFmpeg is unavailable (e.g. Vercel serverless)
-      if (process.env.RAILWAY_API_URL && !ffmpeg) {
-        try {
-          const railwayUrl = `${process.env.RAILWAY_API_URL.replace(/\/$/, '')}/api/youtube/download?${searchParams.toString()}`;
-          const proxyRes = await fetch(railwayUrl);
-          if (proxyRes.ok && proxyRes.body) {
-            return new Response(proxyRes.body, {
-              status: proxyRes.status,
-              headers: proxyRes.headers,
-            });
-          }
-        } catch (e) {
-          console.warn('Railway proxy merge attempt failed, falling back to local merge:', e);
-        }
-      }
-
       const { output } = startMerge(
         assertMediaUrl(videoFormat.url).toString(),
         assertMediaUrl(audioFormat.url).toString(),
