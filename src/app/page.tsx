@@ -239,14 +239,6 @@ export default function Home() {
     return Array.from(grouped.values());
   };
 
-  const [useLocalMerge, setUseLocalMerge] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const storedMerge = localStorage.getItem('use_local_merge');
-      if (storedMerge !== null) return storedMerge === 'true';
-    }
-    return false;
-  });
-
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -289,12 +281,7 @@ export default function Home() {
 
   const isBusy = downloadStatus === 'downloading_video' || downloadStatus === 'downloading_audio' || downloadStatus === 'merging';
 
-  const saveMergePref = (val: boolean) => {
-    setUseLocalMerge(val);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('use_local_merge', String(val));
-    }
-  };
+
 
   const handlePaste = async () => {
     try {
@@ -470,30 +457,7 @@ export default function Home() {
       return;
     }
 
-    // Scenario B: server-side merge (browser handoff)
-    if (useLocalMerge) {
-      if (!selectedAudioFormat) {
-        setError('No compatible audio stream was found for this video.');
-        return;
-      }
-      setDownloadStatus('handoff');
-      setStatusText('Server is merging your file — the download will begin shortly…');
-      logToConsole(`Requesting server-side merge of video (itag: ${selectedVideoFormat.itag}) and audio (itag: ${selectedAudioFormat.itag})...`);
-
-      try {
-        window.location.href = `/api/youtube/download?action=merge&url=${encodeURIComponent(sourceUrl)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&title=${encodeURIComponent(cleanTitle)}`;
-        logToConsole('Server-side merge initiated. File is being compiled and streamed.');
-        addToHistory(title, 'youtube', sourceUrl);
-      } catch (error: unknown) {
-        setDownloadStatus('failed');
-        const message = getErrorMessage(error, 'Server merge request failed.');
-        setError(message);
-        logToConsole(`Error: ${message}`);
-      }
-      return;
-    }
-
-    // Scenario C: client-side chunk proxy + FFmpeg WASM merge
+    // Scenario B: client-side chunk proxy + FFmpeg WASM merge
     try {
       if (!selectedAudioFormat) {
         throw new Error('No compatible audio stream was found for this video.');
@@ -717,8 +681,6 @@ export default function Home() {
       <main className="card">
             {showSettings && (
               <SettingsPanel
-                useLocalMerge={useLocalMerge}
-                saveMergePref={saveMergePref}
                 onClose={() => setShowSettings(false)}
               />
             )}
@@ -827,7 +789,6 @@ export default function Home() {
                 selectYtFormat={selectYtFormat}
                 onDownload={handleYoutubeDownload}
                 isBusy={isBusy}
-                useLocalMerge={useLocalMerge}
               />
             )}
 
@@ -879,7 +840,7 @@ export default function Home() {
    ================================================================ */
 function YoutubeView({
   meta, getCompatibleFormats, showAdvancedCodecs, setShowAdvancedCodecs,
-  selectedVideoFormat, isSplitSelection, selectYtFormat, onDownload, isBusy, useLocalMerge,
+  selectedVideoFormat, isSplitSelection, selectYtFormat, onDownload, isBusy,
 }: {
   meta: YoutubeMetadata;
   getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean) => YoutubeFormat[];
@@ -890,7 +851,6 @@ function YoutubeView({
   selectYtFormat: (format: YoutubeFormat, isSplit: boolean) => void;
   onDownload: () => Promise<void>;
   isBusy: boolean;
-  useLocalMerge: boolean;
 }) {
   const hd = getCompatibleFormats(meta.formats?.videoOnly || [], true);
   const sd = getCompatibleFormats(meta.formats?.videoWithAudio || [], true);
@@ -1023,11 +983,8 @@ function YoutubeView({
         >
           <Download size={20} /> Download selected
         </button>
-        {isSplitSelection && !useLocalMerge && (
-          <p className="cta-note">High-resolution streams are combined entirely in your browser — no upload limits apply.</p>
-        )}
-        {isSplitSelection && useLocalMerge && (
-          <p className="cta-note">Server-side merge is on — the Next.js backend will compile this locally (requires server FFmpeg).</p>
+        {isSplitSelection && (
+          <p className="cta-note">High-resolution streams are combined directly inside your browser — no server limits apply.</p>
         )}
       </div>
     </div>
@@ -1341,12 +1298,8 @@ function HistoryPanel({ history, onClose, onClear }: {
    Settings panel
    ================================================================ */
 function SettingsPanel({
-  useLocalMerge,
-  saveMergePref,
   onClose,
 }: {
-  useLocalMerge: boolean;
-  saveMergePref: (value: boolean) => void;
   onClose: () => void;
 }) {
   return (
@@ -1368,21 +1321,12 @@ function SettingsPanel({
       </div>
 
       <div className="setting">
-        <div className="setting-head">
-          <div>
-            <label className="setting-label">Local server-side merge</label>
-            <p className="setting-desc">
-              Turn on when running this app on your own machine — it uses your local FFmpeg binary to merge YouTube files.
-              Leave off when hosting on Vercel to use in-browser WASM merging.
-            </p>
-          </div>
-          <label className="switch">
-            <input type="checkbox" checked={useLocalMerge} onChange={(e) => saveMergePref(e.target.checked)} />
-            <span className="switch-track" />
-          </label>
-        </div>
+        <label className="setting-label"><Sparkles size={15} /> Client-side WASM engine</label>
+        <p className="setting-desc">
+          All high-definition 1080p and 4K video+audio stream merging is processed locally inside your web browser using WebAssembly.
+          No video files or streams are saved on our servers.
+        </p>
       </div>
-
     </div>
   );
 }
