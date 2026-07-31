@@ -12,6 +12,7 @@ const BROWSER_HEADERS = {
 };
 
 // Safe dynamic loader for native FFmpeg binary to prevent Turbopack build errors on Vercel
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ffmpeg: any = null;
 try {
   const req = typeof eval !== 'undefined' ? eval('require') : require;
@@ -177,6 +178,22 @@ export async function GET(request: Request) {
 
       if (!videoFormat?.url || !audioFormat?.url) {
         return NextResponse.json({ error: 'Video or audio format URL not found.' }, { status: 404 });
+      }
+
+      // Proxy to Railway VPS backend if local native FFmpeg is unavailable (e.g. Vercel serverless)
+      if (process.env.RAILWAY_API_URL && !ffmpeg) {
+        try {
+          const railwayUrl = `${process.env.RAILWAY_API_URL.replace(/\/$/, '')}/api/youtube/download?${searchParams.toString()}`;
+          const proxyRes = await fetch(railwayUrl);
+          if (proxyRes.ok && proxyRes.body) {
+            return new Response(proxyRes.body, {
+              status: proxyRes.status,
+              headers: proxyRes.headers,
+            });
+          }
+        } catch (e) {
+          console.warn('Railway proxy merge attempt failed, falling back to local merge:', e);
+        }
       }
 
       const { output } = startMerge(

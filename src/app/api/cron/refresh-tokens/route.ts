@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchFreshVisitorData, getAutoYouTubeTokens } from '@/utils/yt-potoken';
+import { updateYouTubeVisitorData } from '@/utils/db-cookies';
 
 export const runtime = 'nodejs';
 
@@ -11,11 +12,18 @@ export async function GET() {
     const visitorData = await fetchFreshVisitorData();
     const tokens = await getAutoYouTubeTokens();
 
+    // Persist the fresh visitorData to Neon DB so it survives serverless cold-starts
+    const freshData = visitorData || tokens.visitorData;
+    if (freshData) {
+      await updateYouTubeVisitorData(freshData);
+    }
+
     return NextResponse.json({
       status: 'ok',
       message: 'Automated YouTube PO-Tokens refreshed successfully!',
       timestamp: new Date().toISOString(),
-      visitorDataExtracted: Boolean(visitorData || tokens.visitorData),
+      visitorDataExtracted: Boolean(freshData),
+      syncedToDb: Boolean(freshData),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown cron error';

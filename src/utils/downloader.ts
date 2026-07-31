@@ -4,11 +4,13 @@ const CHUNK_SIZE = 2 * 1024 * 1024;
 // Single-threaded FFmpeg CDN URLs to avoid SharedArrayBuffer restrictions
 const FFMPEG_BASE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ffmpegInstance: any = null;
 
 /**
  * Lazy load and get the single-threaded FFmpeg instance.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
   if (ffmpegInstance) {
     return ffmpegInstance;

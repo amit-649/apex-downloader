@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint src",
     "sync": "node scripts/sync_cookies.js",
-    "stop-chrome": "taskkill /IM chrome.exe /F || exit 0"
+    "stop-chrome": "taskkill /IM chrome.exe /F || exit 0",
+    "db:migrate": "npx tsx src/db/migrate.ts"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@neondatabase/serverless": "^1.1.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "axios": "^1.18.1",
@@ -28,6 +30,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "puppeteer": "^25.3.0",

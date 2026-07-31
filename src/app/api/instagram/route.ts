@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { assertInstagramUrl } from '@/utils/platform-url';
+import { getActiveCookieText, getInstagramSessionId, markSessionFailed } from '@/utils/db-cookies';
 
 export const runtime = 'nodejs';
 
@@ -45,9 +46,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Instagram URL is required' }, { status: 400 });
   }
 
-  // Credentials are maintained only by the server environment, never supplied by visitors.
-  const instagramCookies = process.env.INSTAGRAM_COOKIES || '';
-  const sessionId = process.env.INSTAGRAM_SESSION_ID || '';
+  // Load credentials from Neon DB (falls back to env vars automatically)
+  const instagramCookies = await getActiveCookieText('instagram');
+  const sessionId = await getInstagramSessionId();
 
   // Setup request headers mimicking a real browser session
   const headers: Record<string, string> = {
@@ -325,6 +326,12 @@ export async function GET(request: Request) {
 
   } catch (error: unknown) {
     console.error('Error handling Instagram request:', error);
+    const axiosStatus = (error as { response?: { status?: number } })?.response?.status;
+    // Mark Instagram session as failed on auth errors so it rotates
+    if (axiosStatus === 401 || axiosStatus === 403) {
+      console.warn('[DB] Instagram session returned 401/403 — marking as failed for rotation.');
+      await markSessionFailed('instagram');
+    }
     const msg = error instanceof Error ? error.message : 'Instagram extraction failed';
     return NextResponse.json({ error: msg }, { status: 500 });
   }

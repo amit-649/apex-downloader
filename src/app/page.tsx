@@ -509,7 +509,7 @@ export default function Home() {
       logToConsole('Starting client-side range-based video chunk proxy...');
       logToConsole(`Video format: ${selectedVideoFormat.qualityLabel} | Size: ${videoSizeBytes > 0 ? (videoSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
 
-      const videoBlob = await downloadInChunks(
+      await downloadInChunks(
         selectedVideoFormat.url,
         videoSizeBytes,
         (percent, speed) => {
@@ -528,7 +528,7 @@ export default function Home() {
       logToConsole('Starting client-side range-based audio chunk proxy...');
       logToConsole(`Audio format: ${selectedAudioFormat.qualityLabel} | Size: ${audioSizeBytes > 0 ? (audioSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
 
-      const audioBlob = await downloadInChunks(
+      await downloadInChunks(
         selectedAudioFormat.url,
         audioSizeBytes,
         (percent, speed) => {
