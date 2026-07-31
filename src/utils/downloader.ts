@@ -1,5 +1,6 @@
-// Chunk size for range-based downloads (2MB is optimal)
-const CHUNK_SIZE = 2 * 1024 * 1024;
+// Chunk size for range-based downloads (8MB for high-speed parallel transfer)
+const CHUNK_SIZE = 8 * 1024 * 1024;
+const PARALLEL_CONCURRENCY = 4;
 
 // Single-threaded FFmpeg CDN URLs to avoid SharedArrayBuffer restrictions
 const FFMPEG_BASE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
@@ -42,7 +43,7 @@ function resolveProxyUrl(targetUrl: string): string {
 }
 
 /**
- * Download a file in chunks using HTTP Range headers to bypass serverless timeouts.
+ * Download a file in chunks using HTTP Range headers with parallel concurrency pool.
  */
 export async function downloadInChunks(
   url: string,
@@ -61,13 +62,12 @@ export async function downloadInChunks(
     return new Uint8Array(buffer);
   }
 
-  const chunks: Uint8Array[] = [];
+  const numChunks = Math.ceil(safeTotalBytes / CHUNK_SIZE);
+  const chunks: (Uint8Array | null)[] = new Array(numChunks).fill(null);
   let downloadedBytes = 0;
   const startTime = Date.now();
 
-  const numChunks = Math.ceil(safeTotalBytes / CHUNK_SIZE);
-
-  for (let i = 0; i < numChunks; i++) {
+  const fetchChunk = async (i: number) => {
     if (signal?.aborted) {
       throw new Error('Download cancelled by user.');
     }
@@ -85,34 +85,45 @@ export async function downloadInChunks(
         throw new Error(`Proxy status: ${response.status}`);
       }
     } catch {
-      // Fallback to direct fetch
       response = await fetch(url, {
         headers: { Range: `bytes=${start}-${end}` },
         signal,
       });
       if (!response.ok && response.status !== 206) {
-        throw new Error(`Failed to download media chunk ${i + 1}/${numChunks} (HTTP status: ${response.status})`);
+        throw new Error(`Failed chunk ${i + 1}/${numChunks}`);
       }
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const chunk = new Uint8Array(arrayBuffer);
-    chunks.push(chunk);
+    chunks[i] = chunk;
 
     downloadedBytes += chunk.byteLength;
-
     if (onProgress) {
       const elapsedSec = (Date.now() - startTime) / 1000;
       const speedMbps = elapsedSec > 0 ? (downloadedBytes * 8) / (1000 * 1000 * elapsedSec) : 0;
       onProgress(downloadedBytes, safeTotalBytes, speedMbps);
     }
-  }
+  };
+
+  let nextChunkIdx = 0;
+  const workers = Array.from({ length: Math.min(PARALLEL_CONCURRENCY, numChunks) }, async () => {
+    while (nextChunkIdx < numChunks) {
+      const idx = nextChunkIdx++;
+      await fetchChunk(idx);
+    }
+  });
+
+  await Promise.all(workers);
 
   const combined = new Uint8Array(downloadedBytes);
   let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
+  for (let i = 0; i < numChunks; i++) {
+    const chunk = chunks[i];
+    if (chunk) {
+      combined.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
   }
 
   return combined;
