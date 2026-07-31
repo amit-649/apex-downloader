@@ -122,7 +122,17 @@ app.get('/api/merge', async (req, res) => {
     const cookieArgs = cookieFile ? ['--cookies', cookieFile] : [];
 
     console.log(`[Merger] Extracting format URLs for YouTube video (vItag: ${videoItag}, aItag: ${audioItag})...`);
-    const info = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web', url]);
+    let info;
+    try {
+      info = await runYtDlp([...cookieArgs, url]);
+    } catch (e1) {
+      console.warn('[Merger] Standard extraction failed, retrying with player client fallback:', e1.message);
+      try {
+        info = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web,tv', url]);
+      } catch (e2) {
+        throw new Error(`Format extraction failed: ${e2.message}`);
+      }
+    }
 
     const videoFormat = (info.formats || []).find((f) => String(f.format_id) === String(videoItag));
     const audioFormat = (info.formats || []).find((f) => String(f.format_id) === String(audioItag));
