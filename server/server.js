@@ -105,11 +105,36 @@ app.get('/health', (req, res) => {
 });
 
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
-app.get('/api/merge', async (req, res) => {
-  const { videoUrl, audioUrl, title } = req.query;
+app.all('/api/merge', async (req, res) => {
+  let videoUrl = req.body?.videoUrl || req.query?.videoUrl;
+  let audioUrl = req.body?.audioUrl || req.query?.audioUrl;
+  const title = req.body?.title || req.query?.title;
+
+  // Fallback: extract full URLs from raw request string if query splitting truncated & params
+  if (!videoUrl || !audioUrl || !videoUrl.includes('http')) {
+    const rawUrl = req.url;
+    const vIdx = rawUrl.indexOf('videoUrl=');
+    const aIdx = rawUrl.indexOf('audioUrl=');
+
+    if (vIdx !== -1 && aIdx !== -1) {
+      try {
+        if (vIdx < aIdx) {
+          videoUrl = decodeURIComponent(rawUrl.substring(vIdx + 9, aIdx - 1));
+          const tIdx = rawUrl.indexOf('&title=', aIdx);
+          audioUrl = decodeURIComponent(rawUrl.substring(aIdx + 9, tIdx !== -1 ? tIdx : rawUrl.length));
+        } else {
+          audioUrl = decodeURIComponent(rawUrl.substring(aIdx + 9, vIdx - 1));
+          const tIdx = rawUrl.indexOf('&title=', vIdx);
+          videoUrl = decodeURIComponent(rawUrl.substring(vIdx + 9, tIdx !== -1 ? tIdx : rawUrl.length));
+        }
+      } catch (e) {
+        console.warn('[Merger] Raw URL parsing warning:', e.message);
+      }
+    }
+  }
 
   if (!videoUrl || !audioUrl) {
-    return res.status(400).json({ error: 'videoUrl and audioUrl query parameters are required.' });
+    return res.status(400).json({ error: 'videoUrl and audioUrl parameters are required.' });
   }
 
   if (!ffmpeg) {
@@ -127,16 +152,27 @@ app.get('/api/merge', async (req, res) => {
     const command = ffmpeg()
       .input(videoUrl)
       .inputOptions([
-        '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`,
+        '-user_agent', BROWSER_HEADERS['User-Agent'],
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
       ])
       .input(audioUrl)
       .inputOptions([
-        '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`,
+        '-user_agent', BROWSER_HEADERS['User-Agent'],
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
       ])
       .videoCodec('copy')
       .audioCodec('aac')
       .format('mp4')
-      .outputOptions(['-map 0:v:0', '-map 1:a:0', '-shortest', '-movflags frag_keyframe+empty_moov'])
+      .outputOptions([
+        '-map 0:v:0',
+        '-map 1:a:0',
+        '-shortest',
+        '-movflags frag_keyframe+empty_moov+default_base_moof'
+      ])
       .on('start', (cmdStr) => {
         console.log('[Merger] FFmpeg live stream process started successfully.');
       })
