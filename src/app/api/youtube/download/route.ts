@@ -66,6 +66,8 @@ function createProxyResponse(
   }
 
   responseHeaders.set('Cache-Control', 'private, no-store');
+  responseHeaders.set('Access-Control-Allow-Origin', '*');
+  responseHeaders.set('Access-Control-Allow-Headers', 'Range');
   return new Response(toWebStream(stream), { status, headers: responseHeaders });
 }
 

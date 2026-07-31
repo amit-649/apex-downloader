@@ -34,6 +34,13 @@ async function getFFmpeg(onLog?: (msg: string) => void): Promise<any> {
   return ffmpeg;
 }
 
+function resolveProxyUrl(targetUrl: string): string {
+  if (targetUrl.startsWith('/') || targetUrl.startsWith('http://localhost') || targetUrl.includes('/api/youtube/download')) {
+    return targetUrl;
+  }
+  return `/api/youtube/download?action=proxy&streamUrl=${encodeURIComponent(targetUrl)}`;
+}
+
 /**
  * Download a file in chunks using HTTP Range headers to bypass serverless timeouts.
  */
@@ -43,10 +50,11 @@ export async function downloadInChunks(
   onProgress?: (downloaded: number, total: number, speedMbps: number) => void,
   signal?: AbortSignal
 ): Promise<Uint8Array> {
+  const proxyUrl = resolveProxyUrl(url);
   const safeTotalBytes = totalBytes && !isNaN(totalBytes) && totalBytes > 0 ? totalBytes : 0;
   
   if (safeTotalBytes === 0) {
-    const res = await fetch(url, { signal });
+    const res = await fetch(proxyUrl, { signal });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const buffer = await res.arrayBuffer();
     if (onProgress) onProgress(buffer.byteLength, buffer.byteLength, 0);
@@ -67,7 +75,7 @@ export async function downloadInChunks(
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE - 1, safeTotalBytes - 1);
 
-    const response = await fetch(url, {
+    const response = await fetch(proxyUrl, {
       headers: { Range: `bytes=${start}-${end}` },
       signal,
     });
