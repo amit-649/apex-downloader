@@ -469,7 +469,7 @@ export default function Home() {
       logToConsole(`Requesting live stream merge from ${mergerBaseUrl}...`);
 
       try {
-        const streamUrl = `${mergerBaseUrl.replace(/\/$/, '')}/api/merge?url=${encodeURIComponent(sourceUrl)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&title=${encodeURIComponent(cleanTitle)}`;
+        const streamUrl = `${mergerBaseUrl.replace(/\/$/, '')}/api/merge?videoUrl=${encodeURIComponent(selectedVideoFormat.url)}&audioUrl=${encodeURIComponent(selectedAudioFormat.url)}&title=${encodeURIComponent(cleanTitle)}`;
         window.location.href = streamUrl;
         logToConsole('Live stream pipe initiated. File download starting in browser!');
         addToHistory(title, 'youtube', sourceUrl);

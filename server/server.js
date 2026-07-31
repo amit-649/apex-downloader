@@ -106,10 +106,10 @@ app.get('/health', (req, res) => {
 
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
 app.get('/api/merge', async (req, res) => {
-  const { url, videoItag, audioItag, title } = req.query;
+  const { videoUrl, audioUrl, title } = req.query;
 
-  if (!url || !videoItag || !audioItag) {
-    return res.status(400).json({ error: 'url, videoItag, and audioItag query parameters are required.' });
+  if (!videoUrl || !audioUrl) {
+    return res.status(400).json({ error: 'videoUrl and audioUrl query parameters are required.' });
   }
 
   if (!ffmpeg) {
@@ -117,30 +117,6 @@ app.get('/api/merge', async (req, res) => {
   }
 
   try {
-    const cookieText = await getActiveYouTubeCookie();
-    const cookieFile = writeCookiesTempFile(cookieText);
-    const cookieArgs = cookieFile ? ['--cookies', cookieFile] : [];
-
-    console.log(`[Merger] Extracting format URLs for YouTube video (vItag: ${videoItag}, aItag: ${audioItag})...`);
-    let info;
-    try {
-      info = await runYtDlp([...cookieArgs, url]);
-    } catch (e1) {
-      console.warn('[Merger] Standard extraction failed, retrying with player client fallback:', e1.message);
-      try {
-        info = await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web,tv', url]);
-      } catch (e2) {
-        throw new Error(`Format extraction failed: ${e2.message}`);
-      }
-    }
-
-    const videoFormat = (info.formats || []).find((f) => String(f.format_id) === String(videoItag));
-    const audioFormat = (info.formats || []).find((f) => String(f.format_id) === String(audioItag));
-
-    if (!videoFormat?.url || !audioFormat?.url) {
-      return res.status(404).json({ error: 'Video or audio stream URL not found.' });
-    }
-
     const filename = safeFilename(title, 'Apex_Video');
     console.log(`[Merger] ⚡ Starting live stream pipe for "${filename}.mp4"...`);
 
@@ -149,11 +125,11 @@ app.get('/api/merge', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
     const command = ffmpeg()
-      .input(videoFormat.url)
+      .input(videoUrl)
       .inputOptions([
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`,
       ])
-      .input(audioFormat.url)
+      .input(audioUrl)
       .inputOptions([
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nAccept-Language: ${BROWSER_HEADERS['Accept-Language']}\r\n`,
       ])
@@ -162,7 +138,7 @@ app.get('/api/merge', async (req, res) => {
       .format('mp4')
       .outputOptions(['-map 0:v:0', '-map 1:a:0', '-shortest', '-movflags frag_keyframe+empty_moov'])
       .on('start', (cmdStr) => {
-        console.log('[Merger] FFmpeg process started successfully.');
+        console.log('[Merger] FFmpeg live stream process started successfully.');
       })
       .on('error', (err) => {
         console.error('[Merger] FFmpeg streaming error:', err.message);
@@ -177,7 +153,7 @@ app.get('/api/merge', async (req, res) => {
     command.pipe(res, { end: true });
 
   } catch (error) {
-    console.error('[Merger] Extraction failed:', error.message);
+    console.error('[Merger] Pipeline error:', error.message);
     if (!res.headersSent) {
       res.status(500).json({ error: error.message || 'Stream merger failed.' });
     }
