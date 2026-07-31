@@ -162,6 +162,12 @@ export async function GET(request: Request) {
   }
 
   if (action === 'merge') {
+    if (!ffmpeg) {
+      return NextResponse.json({
+        error: 'Direct server-side API merging is not supported on Vercel serverless functions. Please use the main website UI at https://apexdown.vercel.app to download 1080p/4K videos using in-browser WebAssembly merging.'
+      }, { status: 400 });
+    }
+
     const url = searchParams.get('url');
     const videoItag = searchParams.get('videoItag');
     const audioItag = searchParams.get('audioItag');
