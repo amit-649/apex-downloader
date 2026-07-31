@@ -4,7 +4,7 @@
   "description": "High-performance native FFmpeg live stream merger microservice for ApexDownloader",
   "main": "server.js",
   "scripts": {
-    "postinstall": "node install-ytdlp.js",
+    "postinstall": "node -e \"if (require('fs').existsSync('./install-ytdlp.js')) require('./install-ytdlp.js')\"",
     "start": "node server.js",
     "dev": "node --watch server.js"
   },

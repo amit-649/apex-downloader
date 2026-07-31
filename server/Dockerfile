@@ -14,7 +14,7 @@ RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o 
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package*.json install-ytdlp.js* ./
 RUN npm install --production
 
 COPY . .
