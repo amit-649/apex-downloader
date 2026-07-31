@@ -11,6 +11,8 @@ export async function GET(request: Request) {
   const url = searchParams.get('url');
   const height = searchParams.get('height') || '1080';
   const title = searchParams.get('title') || 'Apex_Video';
+  const videoItag = searchParams.get('videoItag');
+  const audioItag = searchParams.get('audioItag');
   const videoUrl = searchParams.get('videoUrl');
   const audioUrl = searchParams.get('audioUrl');
 
@@ -24,12 +26,12 @@ export async function GET(request: Request) {
 
   try {
     const mergerEndpoint = `${MERGER_URL.replace(/\/$/, '')}/api/merge`;
-    console.log(`[merge-proxy] Forwarding to Render: url=${url}, height=${height}, hasDirectUrls=${Boolean(videoUrl && audioUrl)}`);
+    console.log(`[merge-proxy] Forwarding to Render: url=${url}, videoItag=${videoItag}, height=${height}`);
 
     const response = await fetch(mergerEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, height: parseInt(height), title, videoUrl, audioUrl }),
+      body: JSON.stringify({ url, height: parseInt(height), title, videoItag, audioItag, videoUrl, audioUrl }),
     });
 
     if (!response.ok) {

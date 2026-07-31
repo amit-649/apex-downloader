@@ -152,9 +152,9 @@ async function extractInfoWithFallback(url, cookieArgs) {
 
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
 app.all('/api/merge', async (req, res) => {
-  const { url, height, title, videoUrl: rawVideoUrl, audioUrl: rawAudioUrl } = req.body || req.query || {};
+  const { url, height, title, videoItag, audioItag, videoUrl: rawVideoUrl, audioUrl: rawAudioUrl } = req.body || req.query || {};
 
-  console.log(`[Merger] Request — url: ${url}, height: ${height}, title: ${title}, hasDirectUrls: ${Boolean(rawVideoUrl && rawAudioUrl)}`);
+  console.log(`[Merger] Request — url: ${url}, videoItag: ${videoItag}, height: ${height}, title: ${title}, hasDirectUrls: ${Boolean(rawVideoUrl && rawAudioUrl)}`);
 
   if (!url && (!rawVideoUrl || !rawAudioUrl)) {
     return res.status(400).json({ error: 'YouTube URL or stream URLs are required.' });
@@ -180,24 +180,31 @@ app.all('/api/merge', async (req, res) => {
       const targetHeight = parseInt(height) || 1080;
       const allFormats = info.formats || [];
 
-      // Sort formats by height proximity and bitrate
-      const videoFormats = allFormats
-        .filter(f => f.vcodec && f.vcodec !== 'none' && f.url)
-        .sort((a, b) => {
-          const aHeight = a.height || 0;
-          const bHeight = b.height || 0;
-          const aDiff = Math.abs(aHeight - targetHeight);
-          const bDiff = Math.abs(bHeight - targetHeight);
-          if (aDiff !== bDiff) return aDiff - bDiff;
-          return (b.tbr || b.vbr || 0) - (a.tbr || a.vbr || 0);
-        });
+      // Attempt exact itag match first (matches user selection byte-for-byte)
+      let videoFormat = videoItag ? allFormats.find(f => String(f.format_id) === String(videoItag) && f.url) : null;
+      let audioFormat = audioItag ? allFormats.find(f => String(f.format_id) === String(audioItag) && f.url) : null;
 
-      const audioFormats = allFormats
-        .filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none') && f.url)
-        .sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0));
+      // Fallback: match by height proximity if exact itag not found in rotation
+      if (!videoFormat) {
+        const videoFormats = allFormats
+          .filter(f => f.vcodec && f.vcodec !== 'none' && f.url)
+          .sort((a, b) => {
+            const aHeight = a.height || 0;
+            const bHeight = b.height || 0;
+            const aDiff = Math.abs(aHeight - targetHeight);
+            const bDiff = Math.abs(bHeight - targetHeight);
+            if (aDiff !== bDiff) return aDiff - bDiff;
+            return (b.tbr || b.vbr || 0) - (a.tbr || a.vbr || 0);
+          });
+        videoFormat = videoFormats[0];
+      }
 
-      const videoFormat = videoFormats[0];
-      const audioFormat = audioFormats[0];
+      if (!audioFormat) {
+        const audioFormats = allFormats
+          .filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none') && f.url)
+          .sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0));
+        audioFormat = audioFormats[0];
+      }
 
       if (!videoFormat?.url || !audioFormat?.url) {
         return res.status(404).json({ error: 'Could not resolve compatible video or audio format streams.' });

@@ -478,7 +478,7 @@ export default function Home() {
       try {
         // Same-origin Vercel proxy forwards YouTube URL + height to Render
         // Render runs its own yt-dlp to extract stream URLs (no IP-lock issues)
-        const proxyUrl = `/api/youtube/merge-proxy?url=${encodeURIComponent(sourceUrl)}&height=${height}&title=${encodeURIComponent(cleanTitle)}&videoUrl=${encodeURIComponent(selectedVideoFormat.url)}&audioUrl=${encodeURIComponent(selectedAudioFormat.url)}`;
+        const proxyUrl = `/api/youtube/merge-proxy?url=${encodeURIComponent(sourceUrl)}&height=${height}&title=${encodeURIComponent(cleanTitle)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&videoUrl=${encodeURIComponent(selectedVideoFormat.url)}&audioUrl=${encodeURIComponent(selectedAudioFormat.url)}`;
         window.location.href = proxyUrl;
         logToConsole('Live stream merge initiated. File download starting in browser!');
         addToHistory(title, 'youtube', sourceUrl);
