@@ -457,6 +457,31 @@ export default function Home() {
       return;
     }
 
+    // Option 2: Live Server-Side Pipe Stream Merger (Render / Fly.io)
+    const mergerBaseUrl = process.env.NEXT_PUBLIC_MERGER_URL;
+    if (mergerBaseUrl) {
+      if (!selectedAudioFormat) {
+        setError('No compatible audio stream was found for this video.');
+        return;
+      }
+      setDownloadStatus('handoff');
+      setStatusText('Connecting to high-speed live stream merger...');
+      logToConsole(`Requesting live stream merge from ${mergerBaseUrl}...`);
+
+      try {
+        const streamUrl = `${mergerBaseUrl.replace(/\/$/, '')}/api/merge?url=${encodeURIComponent(sourceUrl)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&title=${encodeURIComponent(cleanTitle)}`;
+        window.location.href = streamUrl;
+        logToConsole('Live stream pipe initiated. File download starting in browser!');
+        addToHistory(title, 'youtube', sourceUrl);
+      } catch (error: unknown) {
+        setDownloadStatus('failed');
+        const message = getErrorMessage(error, 'Live stream merger request failed.');
+        setError(message);
+        logToConsole(`Error: ${message}`);
+      }
+      return;
+    }
+
     // Scenario B: client-side chunk proxy + FFmpeg WASM merge
     try {
       if (!selectedAudioFormat) {
