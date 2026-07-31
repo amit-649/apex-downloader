@@ -150,7 +150,21 @@ export async function GET(request: Request) {
   const action = searchParams.get('action');
 
   if (action === 'proxy') {
-    const streamUrl = searchParams.get('streamUrl');
+    const rawUrl = request.url;
+    const proxyIdx = rawUrl.indexOf('streamUrl=');
+    let streamUrl: string | null = null;
+
+    if (proxyIdx !== -1) {
+      const rawParam = rawUrl.substring(proxyIdx + 10);
+      try {
+        streamUrl = decodeURIComponent(rawParam);
+      } catch {
+        streamUrl = rawParam;
+      }
+    } else {
+      streamUrl = searchParams.get('streamUrl');
+    }
+
     if (!streamUrl) {
       return NextResponse.json({ error: 'streamUrl is required' }, { status: 400 });
     }

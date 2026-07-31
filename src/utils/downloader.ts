@@ -75,13 +75,24 @@ export async function downloadInChunks(
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE - 1, safeTotalBytes - 1);
 
-    const response = await fetch(proxyUrl, {
-      headers: { Range: `bytes=${start}-${end}` },
-      signal,
-    });
-
-    if (!response.ok && response.status !== 206) {
-      throw new Error(`Failed to download chunk ${i + 1}/${numChunks}`);
+    let response: Response;
+    try {
+      response = await fetch(proxyUrl, {
+        headers: { Range: `bytes=${start}-${end}` },
+        signal,
+      });
+      if (!response.ok && response.status !== 206) {
+        throw new Error(`Proxy status: ${response.status}`);
+      }
+    } catch {
+      // Fallback to direct fetch
+      response = await fetch(url, {
+        headers: { Range: `bytes=${start}-${end}` },
+        signal,
+      });
+      if (!response.ok && response.status !== 206) {
+        throw new Error(`Failed to download media chunk ${i + 1}/${numChunks} (HTTP status: ${response.status})`);
+      }
     }
 
     const arrayBuffer = await response.arrayBuffer();
