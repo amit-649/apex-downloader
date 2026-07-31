@@ -21,13 +21,22 @@ const BROWSER_HEADERS = {
 let ffmpeg = null;
 try {
   ffmpeg = require('fluent-ffmpeg');
-  const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-  if (ffmpegInstaller?.path) {
-    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-    console.log(`[Init] FFmpeg path: ${ffmpegInstaller.path}`);
+  if (fs.existsSync('/usr/bin/ffmpeg')) {
+    ffmpeg.setFfmpegPath('/usr/bin/ffmpeg');
+    console.log('[Init] Using system native FFmpeg binary at /usr/bin/ffmpeg');
+  } else {
+    try {
+      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+      if (ffmpegInstaller?.path && fs.existsSync(ffmpegInstaller.path)) {
+        ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+        console.log(`[Init] Using installer FFmpeg path: ${ffmpegInstaller.path}`);
+      }
+    } catch (e) {
+      console.warn('[Init] FFmpeg installer fallback warning:', e.message);
+    }
   }
 } catch (e) {
-  console.warn('[Init] FFmpeg installer warning:', e.message);
+  console.warn('[Init] FFmpeg setup warning:', e.message);
 }
 
 // ── yt-dlp binary path ──────────────────────────────────────────────────────
