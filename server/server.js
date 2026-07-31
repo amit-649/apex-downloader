@@ -209,16 +209,14 @@ app.all('/api/merge', async (req, res) => {
     const command = ffmpeg()
       .input(finalVideoUrl)
       .inputOptions([
-        '-user_agent', BROWSER_HEADERS['User-Agent'],
-        '-headers', 'Referer: https://www.youtube.com/\r\n',
+        '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
       ])
       .input(finalAudioUrl)
       .inputOptions([
-        '-user_agent', BROWSER_HEADERS['User-Agent'],
-        '-headers', 'Referer: https://www.youtube.com/\r\n',
+        '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',

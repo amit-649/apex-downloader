@@ -256,10 +256,15 @@ export async function GET(request: Request) {
       }
     }
 
+    // For standard single-stream formats (e.g. 720p / 360p / audio m4a), redirect browser straight to Google CDN URL
+    if (!wantsMp3) {
+      return NextResponse.redirect(assertMediaUrl(format.url).toString(), 307);
+    }
+
     const response = await axios({
       url: assertMediaUrl(format.url).toString(),
       method: 'GET',
-      headers: BROWSER_HEADERS,
+      headers: { ...BROWSER_HEADERS, Referer: 'https://www.youtube.com/' },
       responseType: 'stream',
       timeout: 30_000,
       maxRedirects: 5,
