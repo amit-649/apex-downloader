@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
-// Allow long-running streams (10 minutes max for large 4K files)
-export const maxDuration = 600;
+// Allow long-running streams (up to 60s on Vercel Hobby)
+export const maxDuration = 60;
 
 const MERGER_URL = process.env.NEXT_PUBLIC_MERGER_URL;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const videoUrl = searchParams.get('videoUrl');
-  const audioUrl = searchParams.get('audioUrl');
+  const url = searchParams.get('url');
+  const height = searchParams.get('height') || '1080';
   const title = searchParams.get('title') || 'Apex_Video';
 
-  if (!videoUrl || !audioUrl) {
-    return NextResponse.json({ error: 'videoUrl and audioUrl are required.' }, { status: 400 });
+  if (!url) {
+    return NextResponse.json({ error: 'YouTube URL is required.' }, { status: 400 });
   }
 
   if (!MERGER_URL) {
@@ -21,26 +21,26 @@ export async function GET(request: Request) {
   }
 
   try {
-    // POST to Render live merger service with full stream URLs in body
     const mergerEndpoint = `${MERGER_URL.replace(/\/$/, '')}/api/merge`;
+    console.log(`[merge-proxy] Forwarding to Render: url=${url}, height=${height}`);
 
     const response = await fetch(mergerEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoUrl, audioUrl, title }),
+      body: JSON.stringify({ url, height: parseInt(height), title }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[merge-proxy] Render merger error:', response.status, errorText);
+      console.error('[merge-proxy] Render error:', response.status, errorText);
       return NextResponse.json(
-        { error: `Live merger returned HTTP ${response.status}: ${errorText}` },
+        { error: `Live merger error: ${errorText}` },
         { status: response.status }
       );
     }
 
     if (!response.body) {
-      return NextResponse.json({ error: 'Live merger returned empty response.' }, { status: 502 });
+      return NextResponse.json({ error: 'Empty response from live merger.' }, { status: 502 });
     }
 
     const safeTitle = (title || 'Apex_Video').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180) || 'Apex_Video';
@@ -53,8 +53,8 @@ export async function GET(request: Request) {
       },
     });
   } catch (error: unknown) {
-    console.error('[merge-proxy] Failed to reach live merger:', error);
+    console.error('[merge-proxy] Connection failed:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ error: `Live merger connection failed: ${message}` }, { status: 502 });
+    return NextResponse.json({ error: `Merger connection failed: ${message}` }, { status: 502 });
   }
 }

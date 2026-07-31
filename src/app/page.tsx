@@ -466,13 +466,21 @@ export default function Home() {
       }
       setDownloadStatus('handoff');
       setStatusText('Connecting to high-speed live stream merger...');
-      logToConsole(`Requesting live stream merge via proxy...`);
+
+      // Extract height from quality label (e.g. "1080p" → 1080, "4K" → 2160)
+      const qualityLabel = selectedVideoFormat.qualityLabel || '';
+      let height = parseInt(qualityLabel) || 1080;
+      if (qualityLabel.toLowerCase().includes('4k')) height = 2160;
+      if (qualityLabel.toLowerCase().includes('8k')) height = 4320;
+
+      logToConsole(`Requesting ${height}p live stream merge via server...`);
 
       try {
-        // Use same-origin Vercel proxy which forwards to Render via POST internally
-        const proxyUrl = `/api/youtube/merge-proxy?videoUrl=${encodeURIComponent(selectedVideoFormat.url)}&audioUrl=${encodeURIComponent(selectedAudioFormat.url)}&title=${encodeURIComponent(cleanTitle)}`;
+        // Same-origin Vercel proxy forwards YouTube URL + height to Render
+        // Render runs its own yt-dlp to extract stream URLs (no IP-lock issues)
+        const proxyUrl = `/api/youtube/merge-proxy?url=${encodeURIComponent(sourceUrl)}&height=${height}&title=${encodeURIComponent(cleanTitle)}`;
         window.location.href = proxyUrl;
-        logToConsole('Live stream pipe initiated. File download starting in browser!');
+        logToConsole('Live stream merge initiated. File download starting in browser!');
         addToHistory(title, 'youtube', sourceUrl);
       } catch (error: unknown) {
         setDownloadStatus('failed');
