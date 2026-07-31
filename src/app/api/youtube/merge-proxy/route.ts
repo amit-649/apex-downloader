@@ -11,9 +11,11 @@ export async function GET(request: Request) {
   const url = searchParams.get('url');
   const height = searchParams.get('height') || '1080';
   const title = searchParams.get('title') || 'Apex_Video';
+  const videoUrl = searchParams.get('videoUrl');
+  const audioUrl = searchParams.get('audioUrl');
 
-  if (!url) {
-    return NextResponse.json({ error: 'YouTube URL is required.' }, { status: 400 });
+  if (!url && (!videoUrl || !audioUrl)) {
+    return NextResponse.json({ error: 'YouTube URL or stream URLs are required.' }, { status: 400 });
   }
 
   if (!MERGER_URL) {
@@ -22,12 +24,12 @@ export async function GET(request: Request) {
 
   try {
     const mergerEndpoint = `${MERGER_URL.replace(/\/$/, '')}/api/merge`;
-    console.log(`[merge-proxy] Forwarding to Render: url=${url}, height=${height}`);
+    console.log(`[merge-proxy] Forwarding to Render: url=${url}, height=${height}, hasDirectUrls=${Boolean(videoUrl && audioUrl)}`);
 
     const response = await fetch(mergerEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, height: parseInt(height), title }),
+      body: JSON.stringify({ url, height: parseInt(height), title, videoUrl, audioUrl }),
     });
 
     if (!response.ok) {

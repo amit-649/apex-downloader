@@ -120,17 +120,35 @@ app.get('/health', (req, res) => {
   });
 });
 
+async function extractInfoWithFallback(url, cookieArgs) {
+  try {
+    console.log('[yt-dlp] Attempt 1: Standard extraction...');
+    return await runYtDlp([...cookieArgs, url]);
+  } catch (err1) {
+    console.warn('[yt-dlp] Attempt 1 failed:', err1.message);
+    try {
+      console.log('[yt-dlp] Attempt 2: Rotated player clients (ios, android, web)...');
+      return await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web', url]);
+    } catch (err2) {
+      console.warn('[yt-dlp] Attempt 2 failed:', err2.message);
+      try {
+        console.log('[yt-dlp] Attempt 3: TV / mweb player clients...');
+        return await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=tv,mweb', url]);
+      } catch (err3) {
+        throw new Error(`YouTube extraction failed on all client rotation attempts: ${err3.message}`);
+      }
+    }
+  }
+}
+
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
-// Accepts: { url: "youtube-video-url", height: 1080|1440|2160, title: "..." }
-// Render runs its own yt-dlp to extract stream URLs (avoids IP-lock issues)
-// Then merges video+audio via FFmpeg and streams back
-app.post('/api/merge', async (req, res) => {
-  const { url, height, title } = req.body || {};
+app.all('/api/merge', async (req, res) => {
+  const { url, height, title, videoUrl: rawVideoUrl, audioUrl: rawAudioUrl } = req.body || req.query || {};
 
-  console.log(`[Merger] Request — url: ${url}, height: ${height}, title: ${title}`);
+  console.log(`[Merger] Request — url: ${url}, height: ${height}, title: ${title}, hasDirectUrls: ${Boolean(rawVideoUrl && rawAudioUrl)}`);
 
-  if (!url) {
-    return res.status(400).json({ error: 'YouTube URL is required.' });
+  if (!url && (!rawVideoUrl || !rawAudioUrl)) {
+    return res.status(400).json({ error: 'YouTube URL or stream URLs are required.' });
   }
 
   if (!ffmpeg) {
@@ -138,69 +156,69 @@ app.post('/api/merge', async (req, res) => {
   }
 
   try {
-    // 1. Get YouTube cookies from Neon DB
-    const cookieText = await getActiveYouTubeCookie();
-    const cookieFile = writeCookiesTempFile(cookieText);
-    const cookieArgs = cookieFile ? ['--cookies', cookieFile] : [];
+    let finalVideoUrl = rawVideoUrl;
+    let finalAudioUrl = rawAudioUrl;
 
-    // 2. Extract format info using yt-dlp on THIS server (Render's IP)
-    console.log('[Merger] Extracting format info with yt-dlp...');
-    const info = await runYtDlp([...cookieArgs, url]);
+    // If direct stream URLs are not provided, extract them using 3-stage yt-dlp fallback
+    if (!finalVideoUrl || !finalAudioUrl) {
+      const cookieText = await getActiveYouTubeCookie();
+      const cookieFile = writeCookiesTempFile(cookieText);
+      const cookieArgs = cookieFile ? ['--cookies', cookieFile] : [];
 
-    // 3. Pick best video format at the requested height
-    const targetHeight = parseInt(height) || 1080;
-    const allFormats = info.formats || [];
+      console.log('[Merger] Extracting format info with 3-stage yt-dlp fallback...');
+      const info = await extractInfoWithFallback(url, cookieArgs);
 
-    // Filter video-only formats (has video codec, no audio or separate audio)
-    const videoFormats = allFormats
-      .filter(f => f.vcodec && f.vcodec !== 'none' && f.url && f.height)
-      .sort((a, b) => {
-        // Prefer exact height match, then closest height
-        const aDiff = Math.abs(a.height - targetHeight);
-        const bDiff = Math.abs(b.height - targetHeight);
-        if (aDiff !== bDiff) return aDiff - bDiff;
-        // For same height, prefer higher bitrate
-        return (b.tbr || b.vbr || 0) - (a.tbr || a.vbr || 0);
-      });
+      const targetHeight = parseInt(height) || 1080;
+      const allFormats = info.formats || [];
 
-    // Filter audio-only formats
-    const audioFormats = allFormats
-      .filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none') && f.url)
-      .sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0));
+      // Sort formats by height proximity and bitrate
+      const videoFormats = allFormats
+        .filter(f => f.vcodec && f.vcodec !== 'none' && f.url)
+        .sort((a, b) => {
+          const aHeight = a.height || 0;
+          const bHeight = b.height || 0;
+          const aDiff = Math.abs(aHeight - targetHeight);
+          const bDiff = Math.abs(bHeight - targetHeight);
+          if (aDiff !== bDiff) return aDiff - bDiff;
+          return (b.tbr || b.vbr || 0) - (a.tbr || a.vbr || 0);
+        });
 
-    const videoFormat = videoFormats[0];
-    const audioFormat = audioFormats[0];
+      const audioFormats = allFormats
+        .filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none') && f.url)
+        .sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0));
 
-    if (!videoFormat?.url) {
-      return res.status(404).json({ error: `No video format found at ${targetHeight}p. Available heights: ${[...new Set(allFormats.filter(f => f.height).map(f => f.height))].join(', ')}` });
+      const videoFormat = videoFormats[0];
+      const audioFormat = audioFormats[0];
+
+      if (!videoFormat?.url || !audioFormat?.url) {
+        return res.status(404).json({ error: 'Could not resolve compatible video or audio format streams.' });
+      }
+
+      finalVideoUrl = videoFormat.url;
+      finalAudioUrl = audioFormat.url;
+      console.log(`[Merger] Resolved video format: ${videoFormat.format_id} (${videoFormat.height || '?'}p), audio: ${audioFormat.format_id}`);
     }
-    if (!audioFormat?.url) {
-      return res.status(404).json({ error: 'No audio format found.' });
-    }
 
-    console.log(`[Merger] Selected video: ${videoFormat.format_id} (${videoFormat.height}p ${videoFormat.vcodec} ${videoFormat.tbr || '?'}kbps)`);
-    console.log(`[Merger] Selected audio: ${audioFormat.format_id} (${audioFormat.acodec} ${audioFormat.abr || '?'}kbps)`);
-
-    // 4. Set response headers for file download
     const filename = safeFilename(title, 'Apex_Video');
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.mp4"`);
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-    // 5. FFmpeg live stream merge
     console.log(`[Merger] ⚡ Starting FFmpeg live stream pipe for "${filename}.mp4"...`);
 
     const command = ffmpeg()
-      .input(videoFormat.url)
+      .input(finalVideoUrl)
       .inputOptions([
         '-user_agent', BROWSER_HEADERS['User-Agent'],
+        '-headers', 'Referer: https://www.youtube.com/\r\n',
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
       ])
-      .input(audioFormat.url)
+      .input(finalAudioUrl)
       .inputOptions([
         '-user_agent', BROWSER_HEADERS['User-Agent'],
+        '-headers', 'Referer: https://www.youtube.com/\r\n',
         '-reconnect', '1',
         '-reconnect_streamed', '1',
         '-reconnect_delay_max', '5',
@@ -215,15 +233,10 @@ app.post('/api/merge', async (req, res) => {
         '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
       ])
       .on('start', (cmd) => {
-        console.log('[Merger] FFmpeg process started.');
-      })
-      .on('progress', (progress) => {
-        if (progress.timemark) {
-          console.log(`[Merger] Progress: ${progress.timemark}`);
-        }
+        console.log('[Merger] FFmpeg process started successfully.');
       })
       .on('error', (err) => {
-        console.error('[Merger] FFmpeg error:', err.message);
+        console.error('[Merger] FFmpeg streaming error:', err.message);
         if (!res.headersSent) {
           res.status(500).json({ error: `FFmpeg error: ${err.message}` });
         }
