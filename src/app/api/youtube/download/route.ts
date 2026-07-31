@@ -122,7 +122,7 @@ function startMerge(videoUrl: string, audioUrl: string): { output: PassThrough }
       output.destroy(error instanceof Error ? error : new Error(String(error)));
     });
 
-  command.stream(output);
+  command.writeToStream(output, { end: true });
   return { output };
 }
 
@@ -141,7 +141,7 @@ function startAudioTranscode(sourceUrl: string): { output: PassThrough } {
       output.destroy(error instanceof Error ? error : new Error(String(error)));
     });
 
-  command.stream(output);
+  command.writeToStream(output, { end: true });
   return { output };
 }
 

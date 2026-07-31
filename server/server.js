@@ -245,7 +245,7 @@ app.all('/api/merge', async (req, res) => {
         console.log(`[Merger] ✅ Stream complete for "${filename}.mp4".`);
       });
 
-    command.pipe(res, { end: true });
+    command.writeToStream(res, { end: true });
 
   } catch (error) {
     console.error('[Merger] Fatal error:', error.message);
