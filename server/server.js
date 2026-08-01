@@ -146,6 +146,59 @@ function safeFilename(value, fallback) {
   return (value || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180) || fallback;
 }
 
+// ── Diagnostic: probe Render's outbound network to youtube.com ───────────────
+// Debugs why yt-dlp extraction works locally but fails on Render despite the
+// same binary/version/flags. If Render cannot reach youtube.com/youtubei/v1,
+// fetchVisitorData() returns null and attempts run WITHOUT visitor_data →
+// "Requested format is not available".
+app.get('/diag', async (req, res) => {
+  const out = { timestamp: new Date().toISOString() };
+
+  // 1. yt-dlp version
+  out.ytdlpVersion = await getYtDlpVersion();
+
+  // 2. Direct probe of the visitor_id endpoint (same URL + key fetchVisitorData uses)
+  try {
+    const YT_PUBLIC_KEY = Buffer.from('QUl6YVN5QU9fRkoyczF2NVFRMF9qMjZWNFEyelcyMVg5MDNfdlkw', 'base64').toString('utf8');
+    const probe = await fetch(
+      `https://www.youtube.com/youtubei/v1/visitor_id?key=${YT_PUBLIC_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
+        body: JSON.stringify({ context: { client: { clientName: 'WEB', clientVersion: '2.20240308.00.00', hl: 'en', gl: 'US' } } }),
+      }
+    );
+    const txt = await probe.text();
+    let vd = null;
+    try { vd = JSON.parse(txt)?.responseContext?.visitorData || null; } catch {}
+    out.visitorProbe = {
+      status: probe.status,
+      ok: probe.ok,
+      hasVisitorData: Boolean(vd),
+      visitorDataPrefix: vd ? vd.substring(0, 20) : null,
+      bodySnippet: txt.substring(0, 200),
+    };
+  } catch (e) {
+    out.visitorProbe = { error: e.message };
+  }
+
+  // 3. Quick yt-dlp extraction smoke test (no cookies, attempt 1 flags)
+  try {
+    const args = ['--js-runtimes', 'node', '--print', '%(title)s'];
+    const title = await new Promise((resolve, reject) => {
+      execFile(getYtDlpPath(), args.concat('https://www.youtube.com/watch?v=jNQXAC9IVRw'), { timeout: 60000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+        if (err) return reject(new Error(stderr?.trim() || err.message));
+        resolve(stdout.trim());
+      });
+    });
+    out.extractionSmokeTest = { ok: true, title };
+  } catch (e) {
+    out.extractionSmokeTest = { ok: false, error: e.message };
+  }
+
+  res.json(out);
+});
+
 // ── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', async (req, res) => {
   const ytdlpExists = fs.existsSync(getYtDlpPath()) || getYtDlpPath() === 'yt-dlp';
