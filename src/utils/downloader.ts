@@ -143,23 +143,23 @@ export async function downloadInChunks(
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE - 1, safeTotalBytes - 1);
 
-    let response: Response;
-    try {
-      response = await fetch(proxyUrl, {
-        headers: { Range: `bytes=${start}-${end}` },
-        signal,
-      });
-      if (!response.ok && response.status !== 206) {
-        throw new Error(`Proxy status: ${response.status}`);
-      }
-    } catch {
-      response = await fetch(url, {
-        headers: { Range: `bytes=${start}-${end}` },
-        signal,
-      });
-      if (!response.ok && response.status !== 206) {
-        throw new Error(`Failed chunk ${i + 1}/${numChunks}`);
-      }
+    // Use the same-origin proxy ONLY. The raw googlevideo URL is IP-locked to
+    // the server that fetched details (Vercel) — a direct browser fetch will
+    // be rejected by YouTube (403) or, worse, HANG silently (which caused the
+    // 2-minute stall + generic "Fatal Error"). So never fall back to `url`.
+    // Also enforce a per-chunk timeout so a stuck connection can't hang the
+    // whole download indefinitely.
+    const chunkSignal = AbortSignal.timeout(60_000);
+    const combinedSignal = signal
+      ? AbortSignal.any([signal, chunkSignal])
+      : chunkSignal;
+
+    const response = await fetch(proxyUrl, {
+      headers: { Range: `bytes=${start}-${end}` },
+      signal: combinedSignal,
+    });
+    if (!response.ok && response.status !== 206) {
+      throw new Error(`Proxy status ${response.status} for chunk ${i + 1}/${numChunks}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
