@@ -46,6 +46,13 @@ function getYtDlpPath() {
   return 'yt-dlp'; // fallback to system PATH
 }
 
+// Absolute path to the JS runtime for yt-dlp. Bare `node` works locally but
+// NOT on Render (yt-dlp 2026+ needs a JS runtime to extract YouTube; without
+// it you get "No supported JavaScript runtime could be found" / "Requested
+// format is not available"). process.execPath is always the exact Node binary
+// running this server, so it is guaranteed to exist.
+const JS_RUNTIME = `node:${process.execPath}`;
+
 // Keep yt-dlp fresh at startup. YouTube changes its format extraction frequently;
 // an outdated binary returns "Requested format is not available" (or empty format
 // lists). Self-update in place, falling back to re-downloading the latest binary.
@@ -184,7 +191,7 @@ app.get('/diag', async (req, res) => {
 
   // 3. Quick yt-dlp extraction smoke test (no cookies, attempt 1 flags)
   try {
-    const args = ['--js-runtimes', 'node', '--print', '%(title)s'];
+    const args = ['--js-runtimes', JS_RUNTIME, '--print', '%(title)s'];
     const title = await new Promise((resolve, reject) => {
       execFile(getYtDlpPath(), args.concat('https://www.youtube.com/watch?v=jNQXAC9IVRw'), { timeout: 60000, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr?.trim() || err.message));
@@ -263,12 +270,13 @@ async function extractInfoWithFallback(url, cookieArgs) {
   };
 
   const attempts = [
-    // NOTE: `--js-runtimes node` is REQUIRED on every attempt. Verified locally
-    // on E6KBAJ0engs: without it yt-dlp returns only itag 18 (320p) and the
-    // video-only/1080p formats are missing → "Requested format is not available".
-    { label: 'Standard + visitor data', args: [...extractorArgs(''), '--js-runtimes', 'node'] },
-    { label: 'Rotated clients (ios, android, web)', args: [...extractorArgs('player_client=ios,android,web'), '--js-runtimes', 'node'] },
-    { label: 'TV / mweb clients', args: [...extractorArgs('player_client=tv,mweb'), '--js-runtimes', 'node'] },
+    // NOTE: `--js-runtimes <abs node path>` is REQUIRED on every attempt.
+    // Verified on Render: without a resolvable JS runtime yt-dlp returns
+    // "No supported JavaScript runtime could be found" / "Requested format
+    // is not available". Bare `node` is NOT found on Render; use the abs path.
+    { label: 'Standard + visitor data', args: [...extractorArgs(''), '--js-runtimes', JS_RUNTIME] },
+    { label: 'Rotated clients (ios, android, web)', args: [...extractorArgs('player_client=ios,android,web'), '--js-runtimes', JS_RUNTIME] },
+    { label: 'TV / mweb clients', args: [...extractorArgs('player_client=tv,mweb'), '--js-runtimes', JS_RUNTIME] },
   ];
 
   const runAttempts = async () => {
