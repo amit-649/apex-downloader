@@ -457,9 +457,14 @@ export default function Home() {
       return;
     }
 
-    // Option 2: Live Server-Side Pipe Stream Merger (Render / Fly.io)
+    // Optional fallback: live server-side merge (Render / Fly.io).
+    // DISABLED by default — Render's datacenter IP is bot-flagged by YouTube,
+    // so its yt-dlp cannot extract 1080p+ formats (verified via /diag). The
+    // reliable path for 1080p+ is the client-side WASM merge below. To force
+    // the server merger, append ?useMerge=1 to the page URL.
     const mergerBaseUrl = process.env.NEXT_PUBLIC_MERGER_URL;
-    if (mergerBaseUrl) {
+    const forceMerge = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('useMerge') === '1';
+    if (mergerBaseUrl && forceMerge) {
       if (!selectedAudioFormat) {
         setError('No compatible audio stream was found for this video.');
         return;
@@ -476,11 +481,6 @@ export default function Home() {
       logToConsole(`Requesting ${height}p live stream merge via server...`);
 
       try {
-        // Post directly to Render (bypasses Vercel serverless 10-60s streaming timeout).
-        // IMPORTANT: do NOT forward videoUrl/audioUrl from the client — those Googlevideo
-        // URLs are IP-locked to the server that fetched details. Render re-extracts fresh
-        // stream URLs on its own IP via yt-dlp (matching videoItag/audioItag), so Googlevideo
-        // accepts the full-length stream instead of dropping it after ~1-2MB.
         const mergerBase = mergerBaseUrl.replace(/\/$/, '');
         const form = document.createElement('form');
         form.method = 'POST';
@@ -518,7 +518,7 @@ export default function Home() {
       return;
     }
 
-    // Scenario B: client-side chunk proxy + FFmpeg WASM merge
+    // Scenario B: client-side chunk proxy + FFmpeg WASM merge (PRIMARY for 1080p+)
     try {
       if (!selectedAudioFormat) {
         throw new Error('No compatible audio stream was found for this video.');

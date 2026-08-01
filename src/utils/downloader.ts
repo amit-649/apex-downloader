@@ -1,6 +1,9 @@
 // Chunk size for range-based downloads (8MB for high-speed parallel transfer)
 const CHUNK_SIZE = 8 * 1024 * 1024;
-const PARALLEL_CONCURRENCY = 4;
+// Higher concurrency for large 1080p/4K video+audio streams — more parallel
+// range requests saturate the connection better. 6 workers is a good balance
+// (too many can trip CDN rate limits / memory usage).
+const PARALLEL_CONCURRENCY = 6;
 
 // Single-threaded FFmpeg CDN URLs to avoid SharedArrayBuffer restrictions
 const FFMPEG_BASE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
@@ -195,21 +198,24 @@ export async function mergeVideoAndAudio(
     }
   };
 
-  if (onProgress) onProgress('Downloading video stream...', 10, 0);
-  const videoData = await downloadInChunks(videoUrl, videoSizeBytes, (d, t, spd) => {
-    if (onProgress) {
-      const pct = Math.round((d / t) * 45);
-      onProgress(`Downloading video stream... (${Math.round((d / (1024 * 1024)))}MB / ${Math.round((t / (1024 * 1024)))}MB)`, pct, spd);
-    }
-  }, signal);
-
-  if (onProgress) onProgress('Downloading audio stream...', 50, 0);
-  const audioData = await downloadInChunks(audioUrl, audioSizeBytes, (d, t, spd) => {
-    if (onProgress) {
-      const pct = 45 + Math.round((d / t) * 45);
-      onProgress(`Downloading audio stream... (${Math.round((d / (1024 * 1024)))}MB / ${Math.round((t / (1024 * 1024)))}MB)`, pct, spd);
-    }
-  }, signal);
+  // Download video and audio streams IN PARALLEL to roughly halve total
+  // download time. The merge below is a mux (-c:v copy), so the bottleneck
+  // is purely download throughput — running both at once makes best use of it.
+  if (onProgress) onProgress('Downloading video & audio streams in parallel...', 10, 0);
+  const [videoData, audioData] = await Promise.all([
+    downloadInChunks(videoUrl, videoSizeBytes, (d, t, spd) => {
+      if (onProgress) {
+        const pct = Math.round((d / t) * 45);
+        onProgress(`Downloading video stream... (${Math.round((d / (1024 * 1024)))}MB / ${Math.round((t / (1024 * 1024)))}MB)`, pct, spd);
+      }
+    }, signal),
+    downloadInChunks(audioUrl, audioSizeBytes, (d, t, spd) => {
+      if (onProgress) {
+        const pct = 45 + Math.round((d / t) * 45);
+        onProgress(`Downloading audio stream... (${Math.round((d / (1024 * 1024)))}MB / ${Math.round((t / (1024 * 1024)))}MB)`, pct, spd);
+      }
+    }, signal),
+  ]);
 
   if (onProgress) onProgress('Initializing WebAssembly engine...', 90, 0);
   const ffmpeg = await getFFmpeg(logHandler);
