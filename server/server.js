@@ -168,6 +168,15 @@ app.all('/api/merge', async (req, res) => {
     let finalVideoUrl = rawVideoUrl;
     let finalAudioUrl = rawAudioUrl;
 
+    // ⚠️ ALWAYS re-extract fresh stream URLs on Render's own IP when a YouTube URL is given.
+    // Client-supplied videoUrl/audioUrl are IP-locked to whichever server fetched details;
+    // Googlevideo drops those connections after ~1-2MB (HTTP 403 / TCP RST), which truncates
+    // the download. Fresh URLs bound to Render's IP stream the full video without interruption.
+    if (url) {
+      finalVideoUrl = null;
+      finalAudioUrl = null;
+    }
+
     // If direct stream URLs are not provided, extract them using 3-stage yt-dlp fallback
     if (!finalVideoUrl || !finalAudioUrl) {
       const cookieText = await getActiveYouTubeCookie();
@@ -228,14 +237,18 @@ app.all('/api/merge', async (req, res) => {
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '10',
+        '-reconnect_delay_max', '15',
+        '-rw_timeout', '30000000',
+        '-http_persistent', '0',
       ])
       .input(finalAudioUrl)
       .inputOptions([
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
         '-reconnect', '1',
         '-reconnect_streamed', '1',
-        '-reconnect_delay_max', '10',
+        '-reconnect_delay_max', '15',
+        '-rw_timeout', '30000000',
+        '-http_persistent', '0',
       ])
       .videoCodec('copy')
       .audioCodec('aac')

@@ -476,10 +476,37 @@ export default function Home() {
       logToConsole(`Requesting ${height}p live stream merge via server...`);
 
       try {
-        // Same-origin Vercel proxy forwards YouTube URL + height to Render
-        // Render runs its own yt-dlp to extract stream URLs (no IP-lock issues)
-        const proxyUrl = `/api/youtube/merge-proxy?url=${encodeURIComponent(sourceUrl)}&height=${height}&title=${encodeURIComponent(cleanTitle)}&videoItag=${selectedVideoFormat.itag}&audioItag=${selectedAudioFormat.itag}&videoUrl=${encodeURIComponent(selectedVideoFormat.url)}&audioUrl=${encodeURIComponent(selectedAudioFormat.url)}`;
-        window.location.href = proxyUrl;
+        // Post directly to Render (bypasses Vercel serverless 10-60s streaming timeout).
+        // IMPORTANT: do NOT forward videoUrl/audioUrl from the client — those Googlevideo
+        // URLs are IP-locked to the server that fetched details. Render re-extracts fresh
+        // stream URLs on its own IP via yt-dlp (matching videoItag/audioItag), so Googlevideo
+        // accepts the full-length stream instead of dropping it after ~1-2MB.
+        const mergerBase = mergerBaseUrl.replace(/\/$/, '');
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `${mergerBase}/api/merge`;
+        form.target = '_self';
+
+        const fields: Record<string, string> = {
+          url: sourceUrl,
+          height: String(height),
+          title: cleanTitle,
+          videoItag: String(selectedVideoFormat.itag),
+          audioItag: String(selectedAudioFormat.itag),
+        };
+
+        for (const [key, val] of Object.entries(fields)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = val;
+          form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+
         logToConsole('Live stream merge initiated. File download starting in browser!');
         addToHistory(title, 'youtube', sourceUrl);
       } catch (error: unknown) {

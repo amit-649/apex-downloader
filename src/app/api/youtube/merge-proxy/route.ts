@@ -28,10 +28,16 @@ export async function GET(request: Request) {
     const mergerEndpoint = `${MERGER_URL.replace(/\/$/, '')}/api/merge`;
     console.log(`[merge-proxy] Forwarding to Render: url=${url}, videoItag=${videoItag}, height=${height}`);
 
+    // When a YouTube URL + itags are supplied, prefer fresh yt-dlp extraction on Render's IP.
+    // Forwarding client-supplied videoUrl/audioUrl risks IP-locked Googlevideo URLs that
+    // Google drops after ~1-2MB (403 / TCP RST) — the very cause of truncated downloads.
+    const forwardVideoUrl = url ? undefined : videoUrl;
+    const forwardAudioUrl = url ? undefined : audioUrl;
+
     const response = await fetch(mergerEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, height: parseInt(height), title, videoItag, audioItag, videoUrl, audioUrl }),
+      body: JSON.stringify({ url, height: parseInt(height), title, videoItag, audioItag, videoUrl: forwardVideoUrl, audioUrl: forwardAudioUrl }),
     });
 
     if (!response.ok) {

@@ -52,14 +52,63 @@ export async function downloadInChunks(
   signal?: AbortSignal
 ): Promise<Uint8Array> {
   const proxyUrl = resolveProxyUrl(url);
-  const safeTotalBytes = totalBytes && !isNaN(totalBytes) && totalBytes > 0 ? totalBytes : 0;
-  
+  let safeTotalBytes = totalBytes && !isNaN(totalBytes) && totalBytes > 0 ? totalBytes : 0;
+
+  // If safeTotalBytes is unknown (0), perform a HEAD request to proxy to get Content-Length
+  if (safeTotalBytes === 0) {
+    try {
+      const headRes = await fetch(proxyUrl, { method: 'HEAD', signal });
+      const contentLength = headRes.headers.get('content-length');
+      if (contentLength) {
+        const parsed = parseInt(contentLength, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          safeTotalBytes = parsed;
+        }
+      }
+    } catch {
+      // Ignore head error and fall back
+    }
+  }
+
+  // If still zero, stream sequentially with reader loop to capture full content without socket cutoff
   if (safeTotalBytes === 0) {
     const res = await fetch(proxyUrl, { signal });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    const buffer = await res.arrayBuffer();
-    if (onProgress) onProgress(buffer.byteLength, buffer.byteLength, 0);
-    return new Uint8Array(buffer);
+
+    const headerCL = res.headers.get('content-length');
+    const knownTotal = headerCL ? parseInt(headerCL, 10) : 0;
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      const buffer = await res.arrayBuffer();
+      return new Uint8Array(buffer);
+    }
+
+    const chunks: Uint8Array[] = [];
+    let downloaded = 0;
+    const startTime = Date.now();
+
+    while (true) {
+      if (signal?.aborted) throw new Error('Download cancelled by user.');
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      downloaded += value.length;
+
+      if (onProgress) {
+        const elapsedSec = (Date.now() - startTime) / 1000;
+        const speedMbps = elapsedSec > 0 ? (downloaded * 8) / (1000 * 1000 * elapsedSec) : 0;
+        onProgress(downloaded, knownTotal > 0 ? knownTotal : downloaded, speedMbps);
+      }
+    }
+
+    const combined = new Uint8Array(downloaded);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return combined;
   }
 
   const numChunks = Math.ceil(safeTotalBytes / CHUNK_SIZE);
@@ -174,7 +223,6 @@ export async function mergeVideoAndAudio(
     '-i', 'input_audio.mp3',
     '-c:v', 'copy',
     '-c:a', 'aac',
-    '-shortest',
     'output.mp4'
   ]);
 
