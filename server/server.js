@@ -147,7 +147,7 @@ function safeFilename(value, fallback) {
 }
 
 // ── Health Check ─────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   const ytdlpExists = fs.existsSync(getYtDlpPath()) || getYtDlpPath() === 'yt-dlp';
   res.json({
     status: 'ok',
@@ -155,9 +155,19 @@ app.get('/health', (req, res) => {
     ffmpegAvailable: Boolean(ffmpeg),
     ytdlpAvailable: ytdlpExists,
     ytdlpPath: getYtDlpPath(),
+    ytdlpVersion: await getYtDlpVersion(),
     timestamp: new Date().toISOString(),
   });
 });
+
+function getYtDlpVersion() {
+  const exe = getYtDlpPath();
+  return new Promise((resolve) => {
+    execFile(exe, ['--version'], { timeout: 10000 }, (err, stdout) => {
+      resolve(err ? null : (stdout || '').trim());
+    });
+  });
+}
 
 // Fresh visitor_data mirrors Vercel's src/utils/yt-potoken.ts. Without it,
 // YouTube returns empty/garbled format lists ("Requested format is not
@@ -208,18 +218,37 @@ async function extractInfoWithFallback(url, cookieArgs) {
     { label: 'TV / mweb clients', args: [...extractorArgs('player_client=tv,mweb'), '--js-runtimes', 'node'] },
   ];
 
-  let lastErr = null;
-  for (let i = 0; i < attempts.length; i++) {
-    const { label, args } = attempts[i];
-    try {
-      console.log(`[yt-dlp] Attempt ${i + 1}: ${label}...`);
-      return await runYtDlp([...cookieArgs, ...args, url]);
-    } catch (e) {
-      console.warn(`[yt-dlp] Attempt ${i + 1} failed:`, e.message);
-      lastErr = e;
+  const runAttempts = async () => {
+    let lastErr = null;
+    for (let i = 0; i < attempts.length; i++) {
+      const { label, args } = attempts[i];
+      try {
+        console.log(`[yt-dlp] Attempt ${i + 1}: ${label}...`);
+        return await runYtDlp([...cookieArgs, ...args, url]);
+      } catch (e) {
+        console.warn(`[yt-dlp] Attempt ${i + 1} failed:`, e.message);
+        lastErr = e;
+      }
     }
+    const err = new Error(`YouTube extraction failed on all client rotation attempts: ${lastErr.message}`);
+    err.retryable = /Requested format is not available|No video formats found|Sign in to confirm/i.test(lastErr ? lastErr.message : '');
+    return { err };
+  };
+
+  const first = await runAttempts();
+  if (!first.err) return first;
+
+  // Self-heal: if extraction failed with a format/sign-in error, force-update
+  // yt-dlp and retry once. Handles a stale binary baked into a cached Docker
+  // layer even when the startup update didn't take effect.
+  if (first.err.retryable) {
+    console.warn('[yt-dlp] Extraction failed — forcing yt-dlp self-update and retrying...');
+    await updateYtDlp();
+    const retry = await runAttempts();
+    if (!retry.err) return retry;
+    throw retry.err;
   }
-  throw new Error(`YouTube extraction failed on all client rotation attempts: ${lastErr.message}`);
+  throw first.err;
 }
 
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
