@@ -46,6 +46,36 @@ function getYtDlpPath() {
   return 'yt-dlp'; // fallback to system PATH
 }
 
+// Keep yt-dlp fresh at startup. YouTube changes its format extraction frequently;
+// an outdated binary returns "Requested format is not available" (or empty format
+// lists). Self-update in place, falling back to re-downloading the latest binary.
+async function updateYtDlp() {
+  const exe = getYtDlpPath();
+  try {
+    const { execFile } = require('child_process');
+    await new Promise((resolve) => {
+      execFile(exe, ['-U', '--no-warnings'], { timeout: 60000 }, (err, stdout, stderr) => {
+        if (err) {
+          console.warn('[yt-dlp] Self-update failed:', stderr?.trim() || err.message);
+        } else {
+          console.log('[yt-dlp] Self-update OK:', (stdout || '').trim().split('\n')[0]);
+        }
+        resolve();
+      });
+    });
+    // Verify it still runs after updating.
+    await new Promise((resolve) => {
+      execFile(exe, ['--version'], { timeout: 10000 }, (err, stdout) => {
+        if (!err) console.log(`[yt-dlp] Running version: ${stdout.trim()}`);
+        else console.warn('[yt-dlp] Version check failed:', err.message);
+        resolve();
+      });
+    });
+  } catch (e) {
+    console.warn('[yt-dlp] Startup update error:', e.message);
+  }
+}
+
 // ── Neon DB helpers ──────────────────────────────────────────────────────────
 function getDb() {
   if (!process.env.DATABASE_URL) return null;
@@ -328,3 +358,7 @@ app.listen(PORT, () => {
   console.log(`   yt-dlp path: ${getYtDlpPath()}`);
   console.log(`   FFmpeg available: ${Boolean(ffmpeg)}`);
 });
+
+// Ensure yt-dlp is current before serving merge requests (fixes
+// "Requested format is not available" caused by an outdated binary).
+updateYtDlp();
