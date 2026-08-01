@@ -129,25 +129,64 @@ app.get('/health', (req, res) => {
   });
 });
 
-async function extractInfoWithFallback(url, cookieArgs) {
+// Fresh visitor_data mirrors Vercel's src/utils/yt-potoken.ts. Without it,
+// YouTube returns empty/garbled format lists ("Requested format is not
+// available") — the exact failure the user hit on Render.
+async function fetchVisitorData() {
   try {
-    console.log('[yt-dlp] Attempt 1: Standard extraction...');
-    return await runYtDlp([...cookieArgs, url]);
-  } catch (err1) {
-    console.warn('[yt-dlp] Attempt 1 failed:', err1.message);
-    try {
-      console.log('[yt-dlp] Attempt 2: Rotated player clients (ios, android, web)...');
-      return await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=ios,android,web', url]);
-    } catch (err2) {
-      console.warn('[yt-dlp] Attempt 2 failed:', err2.message);
-      try {
-        console.log('[yt-dlp] Attempt 3: TV / mweb player clients...');
-        return await runYtDlp([...cookieArgs, '--extractor-args', 'youtube:player_client=tv,mweb', url]);
-      } catch (err3) {
-        throw new Error(`YouTube extraction failed on all client rotation attempts: ${err3.message}`);
+    const YT_PUBLIC_KEY = Buffer.from('QUl6YVN5QU9fRkoyczF2NVFRMF9qMjZWNFEyelcyMVg5MDNfdlkw', 'base64').toString('utf8');
+    const res = await fetch(
+      `https://www.youtube.com/youtubei/v1/visitor_id?key=${YT_PUBLIC_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        },
+        body: JSON.stringify({
+          context: {
+            client: { clientName: 'WEB', clientVersion: '2.20240308.00.00', hl: 'en', gl: 'US' },
+          },
+        }),
       }
+    );
+    const data = await res.json();
+    return data?.responseContext?.visitorData || null;
+  } catch (e) {
+    console.warn('[yt-dlp] visitorData fetch failed:', e.message);
+    return null;
+  }
+}
+
+async function extractInfoWithFallback(url, cookieArgs) {
+  const visitorData = await fetchVisitorData();
+  const visitorPart = visitorData ? `youtube:visitor_data=${visitorData}` : '';
+  // Combine visitor_data + player_client in one --extractor-args list when both exist.
+  const extractorArgs = (clientPart) => {
+    const parts = [];
+    if (visitorPart) parts.push(visitorPart);
+    if (clientPart) parts.push(clientPart);
+    return parts.length ? ['--extractor-args', parts.join(',')] : [];
+  };
+
+  const attempts = [
+    { label: 'Standard + visitor data', args: [...extractorArgs(''), '--js-runtimes', 'node'] },
+    { label: 'Rotated clients (ios, android, web)', args: [...extractorArgs('player_client=ios,android,web')] },
+    { label: 'TV / mweb clients', args: [...extractorArgs('player_client=tv,mweb')] },
+  ];
+
+  let lastErr = null;
+  for (let i = 0; i < attempts.length; i++) {
+    const { label, args } = attempts[i];
+    try {
+      console.log(`[yt-dlp] Attempt ${i + 1}: ${label}...`);
+      return await runYtDlp([...cookieArgs, ...args, url]);
+    } catch (e) {
+      console.warn(`[yt-dlp] Attempt ${i + 1} failed:`, e.message);
+      lastErr = e;
     }
   }
+  throw new Error(`YouTube extraction failed on all client rotation attempts: ${lastErr.message}`);
 }
 
 // ── Live Stream Merger Endpoint ──────────────────────────────────────────────
