@@ -5,6 +5,22 @@ const CHUNK_SIZE = 8 * 1024 * 1024;
 // (too many can trip CDN rate limits / memory usage).
 const PARALLEL_CONCURRENCY = 6;
 
+/**
+ * Detect the container of an audio buffer from its magic bytes so FFmpeg can
+ * demux it correctly. Returns 'm4a' (AAC) or 'mp3'.
+ */
+function detectAudioExt(data: Uint8Array): string {
+  // MP3: ID3 tag at offset 0, or a frame sync (0xFF 0xEx) near the start.
+  if (data.length >= 3) {
+    const isId3 = data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33; // "ID3"
+    const isFrameSync = data[0] === 0xff && (data[1] & 0xe0) === 0xe0; // 0xFFEx
+    if (isId3 || isFrameSync) return 'mp3';
+  }
+  // Everything else (M4A/AAC, OGG, OPUS, etc.) — the paired audio from
+  // YouTube's split streams is virtually always AAC in an M4A container.
+  return 'm4a';
+}
+
 // Single-threaded FFmpeg CDN URLs to avoid SharedArrayBuffer restrictions
 const FFMPEG_BASE_URL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
 
@@ -221,12 +237,19 @@ export async function mergeVideoAndAudio(
   const ffmpeg = await getFFmpeg(logHandler);
 
   await ffmpeg.writeFile('input_video.mp4', videoData);
-  await ffmpeg.writeFile('input_audio.mp3', audioData);
+
+  // Detect the audio container from its magic bytes so FFmpeg demuxes it
+  // correctly. YouTube's paired audio is almost always M4A (AAC, starts with
+  // "ftyp"), but MP3 (ID3 / 0xFFFB frame sync) is also possible. Writing the
+  // wrong extension (e.g. naming AAC bytes ".mp3") makes FFmpeg misdetect the
+  // stream and the merge fails or produces a corrupt file.
+  const audioExt = detectAudioExt(audioData);
+  await ffmpeg.writeFile(`input_audio.${audioExt}`, audioData);
 
   if (onProgress) onProgress('Merging video & audio in browser...', 95, 0);
   await ffmpeg.exec([
     '-i', 'input_video.mp4',
-    '-i', 'input_audio.mp3',
+    '-i', `input_audio.${audioExt}`,
     '-c:v', 'copy',
     '-c:a', 'aac',
     'output.mp4'
@@ -236,7 +259,7 @@ export async function mergeVideoAndAudio(
 
   try {
     await ffmpeg.deleteFile('input_video.mp4');
-    await ffmpeg.deleteFile('input_audio.mp3');
+    await ffmpeg.deleteFile(`input_audio.${audioExt}`);
     await ffmpeg.deleteFile('output.mp4');
   } catch (e) {
     console.warn('Failed to clean virtual filesystem:', e);
