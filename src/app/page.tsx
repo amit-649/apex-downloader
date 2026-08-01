@@ -367,6 +367,11 @@ export default function Home() {
           .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
         if (defaultMerged) {
           setSelectedVideoFormat(defaultMerged);
+          // IMPORTANT: a progressive (video+audio) format must go down the
+          // direct-download path. Explicitly reset the split flag here —
+          // otherwise a stale `true` from a previous selection forces even
+          // 360p/720p into the browser merge and fails.
+          setIsSplitSelection(false);
         } else {
           const bestVideo = [...data.formats.videoOnly]
             .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0] ?? null;
