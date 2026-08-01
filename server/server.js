@@ -170,9 +170,12 @@ async function extractInfoWithFallback(url, cookieArgs) {
   };
 
   const attempts = [
+    // NOTE: `--js-runtimes node` is REQUIRED on every attempt. Verified locally
+    // on E6KBAJ0engs: without it yt-dlp returns only itag 18 (320p) and the
+    // video-only/1080p formats are missing → "Requested format is not available".
     { label: 'Standard + visitor data', args: [...extractorArgs(''), '--js-runtimes', 'node'] },
-    { label: 'Rotated clients (ios, android, web)', args: [...extractorArgs('player_client=ios,android,web')] },
-    { label: 'TV / mweb clients', args: [...extractorArgs('player_client=tv,mweb')] },
+    { label: 'Rotated clients (ios, android, web)', args: [...extractorArgs('player_client=ios,android,web'), '--js-runtimes', 'node'] },
+    { label: 'TV / mweb clients', args: [...extractorArgs('player_client=tv,mweb'), '--js-runtimes', 'node'] },
   ];
 
   let lastErr = null;
