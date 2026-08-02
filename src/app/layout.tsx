@@ -22,8 +22,8 @@ const DOMAIN = process.env.NEXT_PUBLIC_SITE_URL || "https://downloader.amitcodes
 
 export const metadata: Metadata = {
   metadataBase: new URL(DOMAIN),
-  title: "ApexDownloader — Free Instagram Reels, Stories & Pinterest Media Downloader",
-  description: "Free online downloader for Instagram (Reels, Stories, Carousels, Profile Pictures) and Pinterest (Video & Image Pins). Save high-quality media instantly.",
+  title: "Instagram Video Downloader: Save Reels, Stories & Photos (100% Free)",
+  description: "Download Instagram Reels in 1080p Full HD, Stories, Carousel posts, and HD Profile Pictures. ⚡ Fast, free, no login or app required.",
   keywords: [
     "instagram downloader",
     "download instagram reels",
@@ -32,15 +32,21 @@ export const metadata: Metadata = {
     "instagram profile picture downloader",
     "pinterest video downloader",
     "download pinterest images",
-    "free video downloader online",
-    "pinterest pin saver",
+    "free media downloader online",
   ],
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
   alternates: {
     canonical: DOMAIN,
   },
   openGraph: {
-    title: "ApexDownloader — Free Instagram Reels, Stories & Pinterest Media Downloader",
-    description: "Free online downloader for Instagram (Reels, Stories, Carousels) and Pinterest Pins. Save high-quality media instantly.",
+    title: "Instagram Video Downloader: Save Reels, Stories & Photos (100% Free)",
+    description: "Download Instagram Reels in 1080p Full HD, Stories, Carousel posts, and HD Profile Pictures. ⚡ Fast, free, no login or app required.",
     url: DOMAIN,
     siteName: "ApexDownloader",
     images: [
@@ -55,8 +61,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ApexDownloader — Free Instagram Reels, Stories & Pinterest Media Downloader",
-    description: "Free online downloader for Instagram (Reels, Stories, Carousels) and Pinterest Pins. Save high-quality media instantly.",
+    title: "Instagram Video Downloader: Save Reels, Stories & Photos (100% Free)",
+    description: "Download Instagram Reels in 1080p Full HD, Stories, Carousel posts, and HD Profile Pictures. ⚡ Fast, free, no login required.",
     images: ["/og-image.png"],
   },
 };
@@ -77,6 +83,7 @@ export default function RootLayout({
     <html lang="en" className={`${plusJakartaSans.variable} ${spaceGrotesk.variable}`}>
       <head>
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <script
