@@ -2,67 +2,30 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Settings,
   Download,
   Link2,
   RefreshCw,
-  CheckCircle,
   AlertCircle,
-  Info,
-  ChevronDown,
   Clapperboard,
   Image as ImageIcon,
-  Sparkles,
   ShieldCheck,
   Zap,
   LockKeyhole,
   Clipboard,
   X,
-  Square,
-  History,
-  Clock,
-  Video,
+  AudioLines,
+  User,
 } from 'lucide-react';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
 
-const SHOW_ADS = false;
-
-/* ---------- Brand icons ---------- */
-const InstagramIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-    style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-  </svg>
-);
-
-const PinterestIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-    style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-    <path d="M8 11.2c0 3 1.6 5.2 3.4 5.2 1 0 1.6-.8 1.6-2 0-1.3-.7-3.2-.7-4.4 0-1 .6-1.9 1.7-1.9 2 0 3.2 2 3.2 4.3 0 2.8-1.6 5-4 5" />
-    <path d="M12 8.5c-.4 2-1 4.4-1.4 6.2-.4 1.7-.6 3.4-.4 5.3" />
-    <circle cx="12" cy="12" r="10" />
-  </svg>
-);
-
-/* ---------- Types ---------- */
-type Platform = 'instagram' | 'pinterest';
-type DownloadStatus =
-  | 'idle'
-  | 'fetching'
-  | 'downloading_video'
-  | 'downloading_audio'
-  | 'handoff'
-  | 'completed'
-  | 'failed';
+type DownloadStatus = 'idle' | 'fetching' | 'downloading_video' | 'downloading_audio' | 'completed' | 'failed';
 type MediaType = 'image' | 'video';
 
 type HistoryItem = {
   id: string;
   title: string;
-  platform: Platform;
+  platform: string;
   url: string;
   timestamp: number;
 };
@@ -87,48 +50,18 @@ type InstagramMetadata = {
   items?: InstagramItem[];
 };
 
-type PinterestMetadata = {
-  type: MediaType;
-  title: string;
-  description: string;
-  downloadUrl: string;
-  thumbnailUrl: string;
-};
-
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-const PLATFORMS: { id: Platform; label: string; Icon: React.FC<{ size?: number }> }[] = [
-  { id: 'instagram', label: 'Instagram', Icon: InstagramIcon },
-  { id: 'pinterest', label: 'Pinterest', Icon: PinterestIcon },
-];
-
-const EMPTY_HINTS: Record<Platform, { text: string; Icon: React.FC<{ size?: number }> }[]> = {
-  instagram: [
-    { text: 'Posts & Reels', Icon: Clapperboard },
-    { text: 'Stories & Profile pics', Icon: ImageIcon },
-    { text: 'Carousel galleries', Icon: ImageIcon },
-  ],
-  pinterest: [
-    { text: 'Image Pins', Icon: ImageIcon },
-    { text: 'Video Pins', Icon: Video },
-    { text: 'pinterest.com or pin.it', Icon: Link2 },
-  ],
-};
-
-export default function Home() {
-  // Navigation & URL input
-  const [activeTab, setActiveTab] = useState<Platform>('instagram');
+export default function InstagramPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Metadata
-  const [instaMetadata, setInstaMetadata] = useState<InstagramMetadata | null>(null);
-  const [pinMetadata, setPinMetadata] = useState<PinterestMetadata | null>(null);
+  const [meta, setMeta] = useState<InstagramMetadata | null>(null);
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     if (typeof window !== 'undefined') {
@@ -142,11 +75,11 @@ export default function Home() {
     return [];
   });
 
-  const addToHistory = (title: string, platform: Platform, downloadUrl: string) => {
+  const addToHistory = (title: string, downloadUrl: string) => {
     const newItem: HistoryItem = {
       id: String(Date.now()),
-      title: title || 'Download',
-      platform,
+      title: title || 'Instagram Media',
+      platform: 'instagram',
       url: downloadUrl,
       timestamp: Date.now(),
     };
@@ -161,95 +94,48 @@ export default function Home() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Downloader state
   const [downloadStatus, setDownloadStatus] = useState<DownloadStatus>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadSpeed, setDownloadSpeed] = useState(0);
   const [statusText, setStatusText] = useState('');
-  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
-  const [showLog, setShowLog] = useState(false);
-  const consoleBottomRef = useRef<HTMLDivElement>(null);
 
-  const isBusy = downloadStatus === 'downloading_video' || downloadStatus === 'downloading_audio';
+  useEffect(() => {
+    document.body.className = 'theme-instagram';
+    return () => {
+      document.body.className = '';
+    };
+  }, []);
 
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        const trimmed = text.trim();
-        setUrl(trimmed);
-        if (trimmed.includes('instagram.com')) {
-          setActiveTab('instagram');
-        } else if (trimmed.includes('pinterest.com') || trimmed.includes('pin.it')) {
-          setActiveTab('pinterest');
-        }
+        setUrl(text.trim());
       }
     } catch {
-      // Permission error
+      // Permission
     }
   };
 
-  const handleClear = () => {
-    setUrl('');
-  };
-
-  const cancelDownload = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setDownloadStatus('failed');
-    setStatusText('Download canceled by user.');
-    logToConsole('Download task was canceled.');
-  };
-
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputUrl = e.target.value;
-    setUrl(inputUrl);
-
-    if (inputUrl.includes('instagram.com')) {
-      setActiveTab('instagram');
-    } else if (inputUrl.includes('pinterest.com') || inputUrl.includes('pin.it')) {
-      setActiveTab('pinterest');
-    }
-  };
-
-  const logToConsole = (msg: string) => {
-    setConsoleLogs(prev => [...prev.slice(-99), `[${new Date().toLocaleTimeString()}] ${msg}`]);
-  };
-
-  useEffect(() => {
-    consoleBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [consoleLogs]);
-
-  // Fetch details
-  const fetchDetails = async () => {
-    const requestedUrl = url.trim();
-    if (!requestedUrl) {
-      setError('Please paste a link first.');
+  const fetchInstagramDetails = async () => {
+    const inputUrl = url.trim();
+    if (!inputUrl) {
+      setError('Please paste an Instagram Reel, Story, Post, or Profile link first.');
       return;
     }
 
     setLoading(true);
     setError(null);
-    setInstaMetadata(null);
-    setPinMetadata(null);
+    setMeta(null);
 
     try {
-      if (activeTab === 'instagram') {
-        const res = await fetch(`/api/instagram?url=${encodeURIComponent(requestedUrl)}`);
-        const data = await res.json() as InstagramMetadata & { error?: string };
-        if (!res.ok) throw new Error(data.error || 'Failed to fetch Instagram details');
-        setInstaMetadata(data);
-      } else if (activeTab === 'pinterest') {
-        const res = await fetch(`/api/pinterest?url=${encodeURIComponent(requestedUrl)}`);
-        const data = await res.json() as PinterestMetadata & { error?: string };
-        if (!res.ok) throw new Error(data.error || 'Failed to fetch Pinterest details');
-        setPinMetadata(data);
-      }
+      const res = await fetch(`/api/instagram?url=${encodeURIComponent(inputUrl)}`);
+      const data = (await res.json()) as InstagramMetadata & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch Instagram media');
+      setMeta(data);
       setUrl('');
-    } catch (error: unknown) {
-      setError(getErrorMessage(error, 'An unexpected error occurred while fetching details.'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'An unexpected error occurred while extracting Instagram media.'));
     } finally {
       setLoading(false);
     }
@@ -266,13 +152,10 @@ export default function Home() {
     URL.revokeObjectURL(downloadUrl);
   };
 
-  // Direct downloader for Instagram / Pinterest
-  const triggerDirectDownload = async (mediaUrl: string, defaultName: string, mediaType: MediaType) => {
-    setDownloadStatus('downloading_video');
+  const triggerDirectDownload = async (mediaUrl: string, defaultName: string, mediaType: MediaType | 'audio') => {
+    setDownloadStatus(mediaType === 'audio' ? 'downloading_audio' : 'downloading_video');
     setDownloadProgress(0);
-    setStatusText('Downloading file...');
-    setConsoleLogs([]);
-    logToConsole(`Initiating proxy download for media URL: ${mediaUrl.substring(0, 60)}...`);
+    setStatusText('Downloading media...');
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -287,10 +170,11 @@ export default function Home() {
 
       if (!response.body) {
         const blob = await response.blob();
-        triggerBlobDownload(blob, `${defaultName}.${mediaType === 'video' ? 'mp4' : 'jpg'}`);
+        const ext = mediaType === 'video' ? 'mp4' : mediaType === 'audio' ? 'mp3' : 'jpg';
+        triggerBlobDownload(blob, `${defaultName}.${ext}`);
         setDownloadStatus('completed');
-        setStatusText('Download finished!');
-        addToHistory(defaultName, activeTab, mediaUrl);
+        setStatusText('Download completed!');
+        addToHistory(defaultName, mediaUrl);
         return;
       }
 
@@ -312,27 +196,21 @@ export default function Home() {
 
         const elapsedSec = (Date.now() - startTime) / 1000;
         if (elapsedSec > 0) {
-          const mbps = (loadedBytes * 8) / (elapsedSec * 1000 * 1000);
-          setDownloadSpeed(mbps);
+          setDownloadSpeed((loadedBytes * 8) / (elapsedSec * 1000 * 1000));
         }
       }
 
       const blob = new Blob(chunks as BlobPart[]);
-      const extension = mediaType === 'video' ? 'mp4' : 'jpg';
-      triggerBlobDownload(blob, `${defaultName}.${extension}`);
+      const ext = mediaType === 'video' ? 'mp4' : mediaType === 'audio' ? 'mp3' : 'jpg';
+      triggerBlobDownload(blob, `${defaultName}.${ext}`);
 
       setDownloadStatus('completed');
       setStatusText('Download completed successfully!');
-      logToConsole('Download finished successfully.');
-      addToHistory(defaultName, activeTab, mediaUrl);
+      addToHistory(defaultName, mediaUrl);
     } catch (error: unknown) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
+      if (error instanceof Error && error.name === 'AbortError') return;
       setDownloadStatus('failed');
-      const message = getErrorMessage(error, 'Download request failed.');
-      setError(message);
-      logToConsole(`Error: ${message}`);
+      setError(getErrorMessage(error, 'Download request failed.'));
     }
   };
 
@@ -340,8 +218,6 @@ export default function Home() {
     setDownloadStatus('downloading_video');
     setDownloadProgress(0);
     setStatusText(`Downloading ${items.length} files...`);
-    setConsoleLogs([]);
-    logToConsole(`Batch downloading ${items.length} items...`);
 
     try {
       for (let i = 0; i < items.length; i++) {
@@ -354,7 +230,7 @@ export default function Home() {
         await triggerDirectDownload(item.downloadUrl, name, isVid ? 'video' : 'image');
       }
       setDownloadStatus('completed');
-      setStatusText(`Successfully downloaded ${items.length} items!`);
+      setStatusText(`Successfully saved ${items.length} media items!`);
     } catch (error: unknown) {
       setDownloadStatus('failed');
       setError(getErrorMessage(error, 'Batch download failed.'));
@@ -363,90 +239,61 @@ export default function Home() {
 
   return (
     <div className="container">
-      {/* Top Header */}
-      <header className="header">
-        <div className="brand">
-          <div className="logo-badge">
-            <Sparkles size={18} />
-          </div>
-          <h1>ApexDownloader</h1>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            className={`btn btn-ghost ${showHistory ? 'active' : ''}`}
-            onClick={() => { setShowHistory(!showHistory); setShowSettings(false); }}
-            title="Download history"
-          >
-            <History size={18} />
-          </button>
-          <button
-            className={`btn btn-ghost ${showSettings ? 'active' : ''}`}
-            onClick={() => { setShowSettings(!showSettings); setShowHistory(false); }}
-            title="Settings"
-          >
-            <Settings size={18} />
-          </button>
-        </div>
-      </header>
+      <Header
+        showHistory={showHistory}
+        setShowHistory={setShowHistory}
+        showSettings={showSettings}
+        setShowSettings={setShowSettings}
+      />
 
-      {/* Hero */}
-      <div className="hero">
-        <h2>Download Instagram &amp; Pinterest Media</h2>
-        <p>Save high-resolution Reels, Stories, Posts, Profile pictures, and Pinterest Pins instantly.</p>
+      <div className="hero insta-hero">
+        <h1>Instagram Video &amp; Story Downloader</h1>
+        <p>Save Reels in 1080p Full HD, Stories, Carousel posts, and HD profile photos instantly.</p>
       </div>
 
-      <AdBanner position="top" />
-
       {showHistory && (
-        <HistoryPanel
-          history={history}
-          onClose={() => setShowHistory(false)}
-          onClear={() => {
-            setHistory([]);
-            localStorage.removeItem('apex_download_history');
-          }}
-        />
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="section-head" style={{ marginTop: 0 }}>
+            <div className="section-title">Recent Instagram Downloads ({history.length})</div>
+            <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+              onClick={() => { setHistory([]); localStorage.removeItem('apex_download_history'); }}>
+              Clear History
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {history.map((item) => (
+              <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{item.title}</span>
+                <a href={item.url} target="_blank" rel="noopener noreferrer" className="input-action-btn">Re-open</a>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-
-      {/* Primary Card */}
-      <main className="card">
-        {/* Nav tabs */}
-        <div className="nav-tabs" role="tablist">
-          {PLATFORMS.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={activeTab === id}
-              className={`tab-btn ${activeTab === id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab(id);
-                setError(null);
-                setInstaMetadata(null);
-                setPinMetadata(null);
-              }}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-            </button>
-          ))}
+      {showSettings && (
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="section-title" style={{ marginBottom: '0.5rem' }}>Instagram Extraction Authorization</div>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            High-speed Instagram media downloads are processed securely via server-managed session credentials without storing data in your browser.
+          </p>
         </div>
+      )}
 
-        {/* URL Input Box */}
+      <main className="card">
         <div className="input-group">
           <div className="input-wrapper">
             <span className="input-icon"><Link2 size={18} /></span>
             <input
               type="text"
               className="input-field"
-              placeholder={`Paste an ${activeTab === 'instagram' ? 'Instagram' : 'Pinterest'} link...`}
+              placeholder="Paste Instagram Reel, Story, Post or Profile link..."
               value={url}
-              onChange={handleUrlChange}
-              onKeyDown={(e) => e.key === 'Enter' && fetchDetails()}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchInstagramDetails()}
             />
             {url ? (
-              <button className="input-action-btn" onClick={handleClear} title="Clear text">
+              <button className="input-action-btn" onClick={() => setUrl('')} title="Clear">
                 <X size={15} />
               </button>
             ) : (
@@ -455,430 +302,178 @@ export default function Home() {
               </button>
             )}
           </div>
-          <button
-            className="btn btn-accent btn-fetch"
-            onClick={fetchDetails}
-            disabled={loading}
-          >
+          <button className="btn btn-accent" onClick={fetchInstagramDetails} disabled={loading}>
             {loading ? <RefreshCw className="spin" size={18} /> : <RefreshCw size={18} />}
             <span>Fetch</span>
           </button>
         </div>
 
-        {/* Error Alert */}
         {error && (
-          <div className="alert alert-error" role="alert">
+          <div style={{ padding: '0.9rem 1.1rem', background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', color: '#fca5a5', display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1.5rem', fontSize: '0.92rem' }}>
             <AlertCircle size={18} />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Empty State Hints */}
-        {!instaMetadata && !pinMetadata && !loading && (
+        {!meta && !loading && (
           <div className="hints-grid">
-            {EMPTY_HINTS[activeTab]?.map(({ text, Icon }, idx) => (
-              <div key={idx} className="hint-card">
-                <div className="hint-icon"><Icon size={20} /></div>
-                <span>{text}</span>
-              </div>
-            ))}
+            <div className="hint-card"><div className="hint-icon"><Clapperboard size={20} /></div><span>Reels (1080p MP4)</span></div>
+            <div className="hint-card"><div className="hint-icon"><ImageIcon size={20} /></div><span>Stories &amp; Highlights</span></div>
+            <div className="hint-card"><div className="hint-icon"><ImageIcon size={20} /></div><span>Carousel Galleries</span></div>
+            <div className="hint-card"><div className="hint-icon"><User size={20} /></div><span>HD Profile Pictures</span></div>
           </div>
         )}
 
-        {/* Instagram View */}
-        {activeTab === 'instagram' && instaMetadata && (
-          <InstagramView
-            meta={instaMetadata}
-            onDownload={triggerDirectDownload}
-            onBatchDownload={(items, prefix) => triggerBatchDownload(items, prefix)}
-          />
+        {meta && (
+          <div>
+            {meta.type === 'profile_pic' && (
+              <div className="preview" style={{ flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <div className="thumb thumb-round">
+                  <img src={meta.downloadUrl} alt={meta.username} />
+                </div>
+                <div className="preview-body" style={{ alignItems: 'center' }}>
+                  <span className="eyebrow">Instagram Profile</span>
+                  <h2 className="preview-title">@{meta.username}</h2>
+                  {meta.fullName && <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>{meta.fullName}</p>}
+                  {meta.biography && <p className="caption" style={{ textAlign: 'center', maxWidth: '28rem' }}>{meta.biography}</p>}
+                  {meta.followers && <p style={{ fontWeight: 700, marginTop: '0.25rem' }}>{Number(meta.followers).toLocaleString()} followers</p>}
+                  <button className="btn btn-accent" style={{ marginTop: '1rem' }}
+                    onClick={() => triggerDirectDownload(meta.downloadUrl, `pfp_${meta.username}`, 'image')}>
+                    <Download size={17} /> Download HD Profile Photo
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(meta.type === 'video' || meta.type === 'image' || meta.type === 'story') && (
+              <div className="preview">
+                <div className="thumb">
+                  <img src={meta.thumbnailUrl || meta.downloadUrl} alt="Instagram Media" />
+                </div>
+                <div className="preview-body">
+                  <span className="eyebrow">Instagram {meta.type.toUpperCase()}</span>
+                  {meta.username && <h2 className="preview-title">@{meta.username}</h2>}
+                  {meta.caption && <p className="caption">{meta.caption}</p>}
+
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                    <button className="btn btn-accent" onClick={() => triggerDirectDownload(meta.downloadUrl, `instagram_${meta.username || 'media'}`, meta.type === 'video' ? 'video' : 'image')}>
+                      <Download size={17} /> Save {meta.type === 'video' ? 'Video (MP4)' : 'Image (JPG)'}
+                    </button>
+                    {meta.type === 'video' && (
+                      <button className="btn btn-ghost" onClick={() => triggerDirectDownload(meta.downloadUrl, `reel_audio_${meta.username || 'sound'}`, 'audio')}>
+                        <AudioLines size={16} /> Extract Reel Audio (MP3)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(meta.type === 'carousel' || meta.type === 'stories_list') && (
+              <div>
+                <div className="section-head" style={{ marginTop: 0 }}>
+                  <div>
+                    <span className="eyebrow">Instagram {meta.type === 'carousel' ? 'Carousel Gallery' : 'Stories'}</span>
+                    <h2 className="preview-title">@{meta.username}</h2>
+                  </div>
+                  {meta.items && meta.items.length > 1 && (
+                    <button className="btn btn-accent" style={{ padding: '0.55rem 1.1rem', fontSize: '0.88rem' }}
+                      onClick={() => triggerBatchDownload(meta.items!, `instagram_${meta.username || 'gallery'}`)}>
+                      <Download size={16} /> Download All ({meta.items.length})
+                    </button>
+                  )}
+                </div>
+                <div className="stories-grid">
+                  {meta.items?.map((item, idx) => (
+                    <div className="story-card" key={idx}>
+                      <div className="story-media">
+                        <img src={item.thumbnailUrl || item.downloadUrl} alt={`Item ${idx + 1}`} />
+                        {item.type === 'video' && <span className="story-tag">VIDEO</span>}
+                      </div>
+                      <button className="btn btn-ghost" style={{ padding: '0.45rem', fontSize: '0.82rem' }}
+                        onClick={() => triggerDirectDownload(item.downloadUrl, `instagram_${meta.username || 'item'}_${idx + 1}`, item.type)}>
+                        <Download size={14} /> Save {item.type === 'video' ? 'Video' : 'Image'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Pinterest View */}
-        {activeTab === 'pinterest' && pinMetadata && (
-          <PinterestView meta={pinMetadata} onDownload={triggerDirectDownload} />
-        )}
-
-        {/* Progress Panel */}
         {downloadStatus !== 'idle' && (
-          <ProgressPanel
-            status={downloadStatus}
-            progress={downloadProgress}
-            speed={downloadSpeed}
-            statusText={statusText}
-            logs={consoleLogs}
-            showLog={showLog}
-            setShowLog={setShowLog}
-            consoleBottomRef={consoleBottomRef}
-            onCancel={cancelDownload}
-          />
+          <div className="progress">
+            <div className="progress-top">
+              <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                {downloadStatus === 'completed' ? 'Download Finished!' : downloadStatus === 'failed' ? 'Download Failed' : 'Downloading Media...'}
+              </span>
+              {downloadProgress > 0 && <span style={{ fontWeight: 700, color: 'var(--insta-pink)' }}>{downloadProgress}%</span>}
+            </div>
+            <div className="bar">
+              <div className="bar-fill" style={{ width: downloadStatus === 'completed' || downloadStatus === 'failed' ? '100%' : `${downloadProgress}%` }} />
+            </div>
+            <div className="progress-stats">
+              <span>{statusText}</span>
+              {downloadSpeed > 0 && <span>{downloadSpeed.toFixed(1)} Mbps</span>}
+            </div>
+          </div>
         )}
       </main>
 
-      <AdBanner position="bottom" />
-
       <TrustSection />
-
       <FaqSection />
-
-      <footer className="footer">
-        <p>© {new Date().getFullYear()} ApexDownloader. All rights reserved.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
 
-/* ================================================================
-   Instagram view
-   ================================================================ */
-function InstagramView({ meta, onDownload, onBatchDownload }: {
-  meta: InstagramMetadata;
-  onDownload: (mediaUrl: string, defaultName: string, mediaType: MediaType) => Promise<void>;
-  onBatchDownload: (items: Array<{ downloadUrl: string; isVideo?: boolean; type?: string; id?: string }>, prefix: string) => Promise<void>;
-}) {
-  if (meta.type === 'profile_pic') {
-    return (
-      <div className="preview" style={{ flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <div className="thumb thumb-round">
-          <img src={meta.downloadUrl} alt={meta.username} />
-        </div>
-        <div className="preview-body" style={{ alignItems: 'center' }}>
-          <h2 className="preview-title">@{meta.username}</h2>
-          {meta.fullName && <p className="preview-sub">{meta.fullName}</p>}
-          {meta.biography && <p className="caption" style={{ maxWidth: '30rem', textAlign: 'center' }}>{meta.biography}</p>}
-          <p className="preview-sub" style={{ fontWeight: 600 }}>{Number(meta.followers).toLocaleString()} followers</p>
-          <button className="btn btn-accent preview-btn" style={{ marginTop: '0.75rem' }}
-            onClick={() => onDownload(meta.downloadUrl, `pfp_${meta.username}`, 'image')}>
-            <Download size={17} /> Download HD profile picture
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (meta.type === 'video' || meta.type === 'image' || meta.type === 'story') {
-    return (
-      <div className="preview">
-        <div className="thumb">
-          <img src={meta.thumbnailUrl || meta.downloadUrl} alt="Instagram Media" />
-        </div>
-        <div className="preview-body">
-          <span className="eyebrow">Instagram {meta.type.toUpperCase()}</span>
-          {meta.username && <h2 className="preview-title">@{meta.username}</h2>}
-          {meta.caption && <p className="caption">{meta.caption}</p>}
-          <button className="btn btn-accent preview-btn"
-            onClick={() => onDownload(meta.downloadUrl, `instagram_${meta.username || 'media'}`, meta.type === 'video' ? 'video' : 'image')}>
-            <Download size={17} /> Download {meta.type === 'video' ? 'Video (MP4)' : 'Image (JPG)'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (meta.type === 'carousel' || meta.type === 'stories_list') {
-    return (
-      <div>
-        <div className="section-head" style={{ marginTop: 0 }}>
-          <div>
-            <span className="eyebrow">Instagram {meta.type === 'carousel' ? 'Carousel Gallery' : 'Stories'}</span>
-            <h2 className="preview-title">@{meta.username}</h2>
-          </div>
-          {meta.items && meta.items.length > 1 && (
-            <button className="btn btn-accent" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
-              onClick={() => onBatchDownload(meta.items!, `instagram_${meta.username || 'gallery'}`)}>
-              <Download size={15} /> Download All ({meta.items.length})
-            </button>
-          )}
-        </div>
-        <div className="stories-grid" style={{ marginTop: '1rem' }}>
-          {meta.items?.map((item, idx) => (
-            <div className="story-card" key={idx}>
-              <div className="story-media">
-                <img src={item.thumbnailUrl || item.downloadUrl} alt={`Item ${idx + 1}`} />
-                {item.type === 'video' && <span className="story-tag">VIDEO</span>}
-              </div>
-              <button className="btn btn-ghost" style={{ padding: '0.5rem', fontSize: '0.85rem' }}
-                onClick={() => onDownload(item.downloadUrl, `instagram_${meta.username || 'item'}_${idx + 1}`, item.type)}>
-                <Download size={14} /> Save {item.type === 'video' ? 'Video' : 'Image'}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-}
-
-/* ================================================================
-   Pinterest view
-   ================================================================ */
-function PinterestView({ meta, onDownload }: {
-  meta: PinterestMetadata;
-  onDownload: (mediaUrl: string, defaultName: string, mediaType: MediaType) => Promise<void>;
-}) {
-  const isPortrait = meta.type === 'image';
-  return (
-    <div className="preview">
-      <div className={`thumb ${isPortrait ? 'thumb-portrait' : ''}`}>
-        <img src={meta.thumbnailUrl} alt={meta.title} />
-      </div>
-      <div className="preview-body">
-        <span className="eyebrow">Pinterest {String(meta.type).toUpperCase()}</span>
-        <h2 className="preview-title">{meta.title}</h2>
-        {meta.description && <p className="caption">{meta.description}</p>}
-        <button className="btn btn-accent preview-btn"
-          onClick={() => onDownload(meta.downloadUrl, 'pinterest_pin', meta.type)}>
-          <Download size={17} /> Download original ({meta.type})
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ================================================================
-   Progress panel
-   ================================================================ */
-function ProgressPanel({ status, progress, speed, statusText, logs, showLog, setShowLog, consoleBottomRef, onCancel }: {
-  status: DownloadStatus;
-  progress: number;
-  speed: number;
-  statusText: string;
-  logs: string[];
-  showLog: boolean;
-  setShowLog: React.Dispatch<React.SetStateAction<boolean>>;
-  consoleBottomRef: React.RefObject<HTMLDivElement | null>;
-  onCancel?: () => void;
-}) {
-  const labelMap: Record<string, string> = {
-    downloading_video: 'Downloading video…',
-    downloading_audio: 'Downloading audio…',
-    handoff: 'Handed off to your browser',
-    completed: 'Complete',
-    failed: 'Failed',
-  };
-  const isDeterminate = status === 'downloading_video' || status === 'downloading_audio';
-  const isSuccess = status === 'completed';
-  const isError = status === 'failed';
-
-  return (
-    <div className="progress" role="status" aria-live="polite">
-      <div className="progress-top">
-        <span className={`progress-label ${isSuccess ? 'is-success' : ''} ${isError ? 'is-error' : ''}`}>
-          {isSuccess && <CheckCircle size={16} />}
-          {isError && <AlertCircle size={16} />}
-          {status === 'handoff' && <Info size={16} />}
-          {labelMap[status] || status}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {isDeterminate && <span className="progress-pct">{progress}%</span>}
-          {isDeterminate && onCancel && (
-            <button
-              className="input-action-btn"
-              onClick={onCancel}
-              title="Cancel current download"
-              style={{ color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }}
-            >
-              <Square size={12} fill="currentColor" /> Cancel
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="bar">
-        <div
-          className={`bar-fill ${status === 'handoff' ? 'is-indeterminate' : ''} ${isSuccess ? 'is-success' : ''} ${isError ? 'is-error' : ''}`}
-          style={{ width: isSuccess || isError ? '100%' : `${progress}%` }}
-        />
-      </div>
-
-      <div className="progress-stats">
-        <span>{statusText}</span>
-        {isDeterminate && speed > 0 && <span className="spd">{speed.toFixed(1)} Mbps</span>}
-      </div>
-
-      {logs.length > 0 && (
-        <>
-          <button className="log-toggle" onClick={() => setShowLog((isShown) => !isShown)} aria-expanded={showLog}>
-            <ChevronDown size={14} style={{ transform: showLog ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
-            {showLog ? 'Hide' : 'Show'} technical details
-          </button>
-          {showLog && (
-            <div className="log">
-              {logs.map((log: string, i: number) => <div key={i}>{log}</div>)}
-              <div ref={consoleBottomRef} />
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ================================================================
-   History Panel Component
-   ================================================================ */
-function HistoryPanel({ history, onClose, onClear }: {
-  history: HistoryItem[];
-  onClose: () => void;
-  onClear: () => void;
-}) {
-  return (
-    <div className="settings" style={{ marginBottom: '1.5rem' }}>
-      <div className="section-head" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
-        <div className="section-title"><History size={18} /> Recent Downloads ({history.length})</div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={onClear}>
-            Clear History
-          </button>
-          <button className="btn btn-ghost" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={onClose}>
-            Done
-          </button>
-        </div>
-      </div>
-      <div className="history-list">
-        {history.map((item) => (
-          <div className="history-item" key={item.id}>
-            <div>
-              <div className="history-item-title">{item.title}</div>
-              <span className="hint" style={{ fontSize: '0.75rem' }}>
-                <Clock size={11} /> {new Date(item.timestamp).toLocaleTimeString()} · {item.platform.toUpperCase()}
-              </span>
-            </div>
-            <a href={item.url} target="_blank" rel="noopener noreferrer" className="input-action-btn">
-              <Download size={13} /> Re-open
-            </a>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ================================================================
-   Settings panel
-   ================================================================ */
-function SettingsPanel({
-  onClose,
-}: {
-  onClose: () => void;
-}) {
-  return (
-    <div className="settings">
-      <div className="section-head" style={{ marginTop: 0, marginBottom: '0.5rem' }}>
-        <div className="section-title"><Settings size={18} /> Settings</div>
-        <button className="btn btn-ghost" style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }} onClick={onClose}>
-          Done
-        </button>
-      </div>
-
-      <div className="setting">
-        <label className="setting-label"><ShieldCheck size={15} /> Service authorization</label>
-        <p className="setting-desc">
-          Instagram requests use server-managed authorization for high-quality extraction.
-          Visitors are never asked to paste or store account cookies in this browser.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ================================================================
-   Ad Banner Component
-   ================================================================ */
-function AdBanner({ position }: { position: 'top' | 'bottom' }) {
-  if (!SHOW_ADS) return null;
-
-  return (
-    <div className="ad-section">
-      <div className="ad-label">Sponsored</div>
-      <div className="ad-wrapper">
-        <a 
-          href="#" 
-          onClick={(e) => e.preventDefault()} 
-          className="ad-fallback"
-        >
-          <span>Sponsor Space Available ({position === 'top' ? 'Leaderboard' : 'Footer'})</span>
-          <p>This premium ad space supports fast download servers. Click to advertise here.</p>
-        </a>
-      </div>
-    </div>
-  );
-}
-
-/* ================================================================
-   Trust Section Component
-   ================================================================ */
 function TrustSection() {
   return (
     <section className="trust-section">
       <div className="trust-grid">
         <div className="trust-card">
-          <div className="trust-icon">
-            <ShieldCheck size={26} />
-          </div>
+          <div className="trust-icon"><ShieldCheck size={24} /></div>
           <h3>Private &amp; Secure</h3>
-          <p>Direct high-speed media processing without storing your personal browsing data.</p>
+          <p>Direct media extraction with no personal login required.</p>
         </div>
         <div className="trust-card">
-          <div className="trust-icon">
-            <Zap size={24} />
-          </div>
-          <h3>High-Speed Downloads</h3>
-          <p>Media is securely fetched in original high resolution for instant download.</p>
+          <div className="trust-icon"><Zap size={24} /></div>
+          <h3>Full HD Downloads</h3>
+          <p>Download original 1080p Reels, full quality Stories, and uncompressed Photos.</p>
         </div>
         <div className="trust-card">
-          <div className="trust-icon">
-            <LockKeyhole size={24} />
-          </div>
+          <div className="trust-icon"><LockKeyhole size={24} /></div>
           <h3>100% Safe Connection</h3>
-          <p>Protected by HTTPS encryption for fast and safe media downloads.</p>
+          <p>Encrypted HTTPS delivery directly to your device.</p>
         </div>
       </div>
     </section>
   );
 }
 
-/* ================================================================
-   FAQ / SEO Section Component
-   ================================================================ */
 function FaqSection() {
   const faqData = [
     {
-      q: 'Can I download Instagram Reels, Stories, and Carousel posts?',
-      a: 'Yes! ApexDownloader supports downloading public Instagram posts, Reels, stories, and carousel galleries in full resolution. Simply paste the Instagram link and click Fetch to extract all media instantly.',
+      q: 'How to download Instagram Reels in 1080p Full HD?',
+      a: 'Paste the link of the Instagram Reel into ApexDownloader and click Fetch. You will instantly get a direct download link for the original 1080p MP4 video.',
     },
     {
-      q: 'How to download Pinterest images and videos online?',
-      a: 'Select the Pinterest tab, paste the link of the Pin you wish to save, and click Fetch. The downloader extracts the highest resolution direct download URL for the media (including MP4 video files and clean high-resolution JPEGs) so you can save them instantly to your device.',
+      q: 'Can I download Instagram Stories and Story Highlights?',
+      a: 'Yes! Enter an Instagram username or story link to view and save active stories or batch-download full story highlights.',
     },
     {
-      q: 'Can I download Instagram Profile Pictures in HD?',
-      a: 'Yes, paste an Instagram profile URL or handle, and ApexDownloader will retrieve the full HD profile photo for direct saving.',
+      q: 'How to download Instagram Carousel multi-slide posts?',
+      a: 'When you paste a carousel link, ApexDownloader extracts all images and videos into a gallery with a "Download All" option.',
     },
     {
-      q: 'Are there download limits or charges?',
-      a: 'No, ApexDownloader is 100% free with no limits or speed caps!',
+      q: 'Can I save high resolution Instagram profile photos?',
+      a: 'Yes, paste the profile URL to extract the original HD profile avatar.',
     },
   ];
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: faqData.map(({ q, a }) => ({
-      '@type': 'Question',
-      name: q,
-      acceptedAnswer: { '@type': 'Answer', text: a },
-    })),
-  };
-
   return (
     <section className="faq-section">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
       <h2 className="faq-heading">Frequently Asked Questions</h2>
       <div className="faq-container">
         {faqData.map(({ q, a }, i) => (
