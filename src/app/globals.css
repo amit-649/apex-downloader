@@ -302,7 +302,7 @@ body::after {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .hero.insta-hero h1 {
@@ -315,6 +315,48 @@ body::after {
   background: linear-gradient(135deg, #ffffff 0%, #f87171 60%, #e60023 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* ===== Rotating Text Flip Animation ===== */
+.hero-subtitle-rotating {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.rotating-text-span {
+  display: inline-block;
+  transition: transform 0.25s ease-out, opacity 0.25s ease-out, filter 0.25s ease-out;
+  background: var(--insta-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+}
+
+.pin-theme .rotating-text-span {
+  background: var(--pin-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.rotating-text-span.flip-in {
+  opacity: 1;
+  transform: translateY(0px);
+  filter: blur(0px);
+}
+
+.rotating-text-span.flip-out {
+  opacity: 0;
+  transform: translateY(-14px);
+  filter: blur(3px);
 }
 
 .hero p {

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { RotatingText } from '@/components/RotatingText';
 
 type DownloadStatus = 'idle' | 'fetching' | 'downloading_video' | 'downloading_audio' | 'completed' | 'failed';
 type MediaType = 'image' | 'video';
@@ -253,7 +254,13 @@ export default function InstagramPage() {
           <span>#1 Free Instagram Downloader • 1080p Full HD</span>
         </div>
         <h1>Instagram Video &amp; Story Downloader</h1>
-        <p>Save Reels in 1080p Full HD, Stories, Carousel posts, and HD profile photos instantly.</p>
+        <div className="hero-subtitle-rotating">
+          <span>Your downloads,</span>
+          <RotatingText
+            words={['100% Private.', 'Full HD 1080p.', 'Zero Cost.', 'Always Fast.', 'No Login Required.']}
+            interval={1450}
+          />
+        </div>
       </div>
 
       {showHistory && (

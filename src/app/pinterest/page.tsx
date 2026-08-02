@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { RotatingText } from '@/components/RotatingText';
 
 type DownloadStatus = 'idle' | 'fetching' | 'downloading_video' | 'completed' | 'failed';
 type MediaType = 'image' | 'video';
@@ -216,7 +217,13 @@ export default function PinterestPage() {
           <span>#1 Free Pinterest Media Downloader</span>
         </div>
         <h1>Pinterest Video &amp; Image Downloader</h1>
-        <p>Save Video Pins in Full HD, original high-resolution Images, and animated GIFs instantly.</p>
+        <div className="hero-subtitle-rotating">
+          <span>Your downloads,</span>
+          <RotatingText
+            words={['Original 4K Quality.', 'Video & Image Pins.', 'Zero Cost.', '100% Safe.', 'Fast Downloads.']}
+            interval={1450}
+          />
+        </div>
       </div>
 
       {showHistory && (
