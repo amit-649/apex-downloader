@@ -210,34 +210,22 @@ export default function Home() {
       return standard ? [best, standard] : [best];
     }
 
-    // When Advanced Codecs is OFF (default): return progressive formats only (direct download)
-    if (!showAdvancedCodecs) {
-      // Filter to only progressive (video+audio) formats
-      // Keep ALL progressive formats — don't dedupe aggressively, let user choose
-      const progressive = formats.filter(f => f.hasVideo && f.hasAudio);
-      // Sort: highest resolution first, prefer MP4/H.264
-      return progressive.sort((a, b) => {
-        // Extract numeric resolution from qualityLabel (e.g., "1080p" -> 1080)
-        const getRes = (label: string) => {
-          const m = label.match(/(\d+)p/);
-          return m ? parseInt(m[1], 10) : 0;
-        };
-        const resDiff = getRes(b.qualityLabel) - getRes(a.qualityLabel);
-        if (resDiff !== 0) return resDiff;
-        // Same resolution: prefer MP4, then H.264
-        const aMp4 = a.container?.toLowerCase() === 'mp4';
-        const bMp4 = b.container?.toLowerCase() === 'mp4';
-        const aH264 = a.codec?.toLowerCase() === 'h.264';
-        const bH264 = b.codec?.toLowerCase() === 'h.264';
-        if (aMp4 !== bMp4) return bMp4 ? 1 : -1;
-        if (aH264 !== bH264) return bH264 ? 1 : -1;
-        return 0;
+    // Helper: filter out VP9/AV1/Opus when Advanced Codecs is OFF
+    const filterBasicCodecs = (formatList: YoutubeFormat[]): YoutubeFormat[] => {
+      if (showAdvancedCodecs) return formatList;
+      return formatList.filter(f => {
+        const codec = f.codec?.toLowerCase() || '';
+        return codec !== 'vp9' && codec !== 'av1' && codec !== 'opus';
       });
-    }
+    };
 
-    // Advanced Codecs ON: return split (video-only) formats, preferring MP4/H.264 then VP9/AV1
-    const split = formats.filter(f => f.hasVideo && !f.hasAudio);
-    return split.sort((a, b) => {
+    // ALWAYS return both progressive AND split formats
+    // "Advanced Codecs" toggle only filters out VP9/AV1/Opus from BOTH lists
+    const progressive = filterBasicCodecs(formats.filter(f => f.hasVideo && f.hasAudio));
+    const split = filterBasicCodecs(formats.filter(f => f.hasVideo && !f.hasAudio));
+
+    // Sort both: highest resolution first, prefer MP4/H.264
+    const sortByRes = (a: YoutubeFormat, b: YoutubeFormat) => {
       const getRes = (label: string) => {
         const m = label.match(/(\d+)p/);
         return m ? parseInt(m[1], 10) : 0;
@@ -251,7 +239,16 @@ export default function Home() {
       if (aMp4 !== bMp4) return bMp4 ? 1 : -1;
       if (aH264 !== bH264) return bH264 ? 1 : -1;
       return 0;
-    });
+    };
+
+    if (isVideo) {
+      // For video tab, we need to differentiate progressive vs split for UI
+      // But we return both combined - UI uses hasAudio/hasVideo to separate
+      return [...progressive, ...split].sort(sortByRes);
+    }
+
+    // For audio tab - return progressive (already filtered)
+    return progressive.sort(sortByRes);
   };
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {
@@ -899,9 +896,15 @@ function YoutubeView({
   onDownload: () => Promise<void>;
   isBusy: boolean;
 }) {
-  const hd = getCompatibleFormats(meta.formats?.videoOnly || [], true);
-  const sd = getCompatibleFormats(meta.formats?.videoWithAudio || [], true);
-  const audio = getCompatibleFormats(meta.formats?.audioOnly || [], false);
+  // Pass ALL formats to getCompatibleFormats — it does the filtering internally
+  const allFormats = [
+    ...(meta.formats?.videoWithAudio || []),
+    ...(meta.formats?.videoOnly || []),
+    ...(meta.formats?.audioOnly || []),
+  ];
+  const hd = getCompatibleFormats(allFormats, true).filter(f => f.hasVideo && !f.hasAudio);
+  const sd = getCompatibleFormats(allFormats, true).filter(f => f.hasVideo && f.hasAudio);
+  const audio = getCompatibleFormats(allFormats, false);
 
   return (
     <div>
