@@ -15,6 +15,9 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
     return () => clearInterval(interval);
   }, []);
 
+  // 100% Mathematically Symmetrical Lemniscate Infinity Symbol Path
+  const infinityPath = "M 12 12 C 9.2 7.5, 3.8 7.5, 3.8 12 C 3.8 16.5, 9.2 16.5, 12 12 C 14.8 7.5, 20.2 7.5, 20.2 12 C 20.2 16.5, 14.8 16.5, 12 12 Z";
+
   return (
     <div className="apex-crisp-logo-container" style={{ width: size, height: size }} title="ApexDownloader">
       <svg
@@ -60,19 +63,19 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
           <path d="M12 9.5 L7 18 h10 Z" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
         </g>
 
-        {/* === SHAPE 1: Smooth Figure-8 Infinity Loop (Frame 00:03) === */}
+        {/* === SHAPE 1: Perfectly Symmetrical Infinity 8 Symbol (Frame 00:03) === */}
         <g className="vector-shape shape-infinity">
           <path
-            d="M12 12c-2.2-2.2-5-3-7-1.2S3.5 16 6.5 17.5 12 14.2 12 12c0-2.2 3.2-5 5.5-3.2s3.5 5.2 0.5 6.7S12 14.2 12 12z"
+            d={infinityPath}
             stroke="url(#neonBrandGrad)"
-            strokeWidth="2.4"
+            strokeWidth="2.6"
             fill="none"
             filter="url(#neonBlurGlow)"
           />
           <path
-            d="M12 12c-2.2-2.2-5-3-7-1.2S3.5 16 6.5 17.5 12 14.2 12 12c0-2.2 3.2-5 5.5-3.2s3.5 5.2 0.5 6.7S12 14.2 12 12z"
+            d={infinityPath}
             stroke="#FFFFFF"
-            strokeWidth="1.2"
+            strokeWidth="1.3"
             fill="none"
           />
         </g>
