@@ -91,17 +91,14 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
           />
         </g>
 
-        {/* === SHAPE 2: Razor-Sharp Unblurred Download Button Icon === */}
+        {/* === SHAPE 2: Vibrant Solid Gradient Download Button Icon (No white stroke on white canvas!) === */}
         <g className="vector-shape shape-download">
-          {/* Outer Gradient Layer */}
-          <path d="M12 2.5 V13.5" stroke={`url(#${gradId})`} strokeWidth="3" strokeLinecap="round" fill="none" />
-          <path d="M6.5 9 L12 14.5 L17.5 9" stroke={`url(#${gradId})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          <path d="M4.5 19 H19.5" stroke={`url(#${gradId})`} strokeWidth="3" strokeLinecap="round" fill="none" />
-
-          {/* Inner Crisp White High-Contrast Core */}
-          <path d="M12 2.5 V13.5" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" fill="none" />
-          <path d="M6.5 9 L12 14.5 L17.5 9" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          <path d="M4.5 19 H19.5" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+          {/* Shaft (Vertical Line) */}
+          <path d="M12 2.5 V13.5" stroke={`url(#${gradId})`} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+          {/* Arrowhead Chevron */}
+          <path d="M6.5 9 L12 14.5 L17.5 9" stroke={`url(#${gradId})`} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          {/* Bottom Media Tray */}
+          <path d="M4.5 19 H19.5" stroke={`url(#${gradId})`} strokeWidth="2.5" strokeLinecap="round" fill="none" />
         </g>
       </svg>
     </div>
