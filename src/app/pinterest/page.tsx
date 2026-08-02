@@ -13,6 +13,7 @@ import {
   X,
   Video,
   Image as ImageIcon,
+  Sparkles,
 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
@@ -210,6 +211,10 @@ export default function PinterestPage() {
       />
 
       <div className="hero pin-hero">
+        <div className="hero-badge">
+          <Sparkles size={13} />
+          <span>#1 Free Pinterest Media Downloader</span>
+        </div>
         <h1>Pinterest Video &amp; Image Downloader</h1>
         <p>Save Video Pins in Full HD, original high-resolution Images, and animated GIFs instantly.</p>
       </div>
