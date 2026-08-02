@@ -58,13 +58,17 @@ export async function GET(request: Request) {
       return m ? parseInt(m[1], 10) : 0;
     };
 
-    // Group into videoWithAudio (progressive <= 720p/720p60, no merging needed) and audioOnly
+    // Group into videoWithAudio (progressive <= 720p) and videoOnly (split <= 720p/720p60)
     const videoWithAudio = validFormats.filter(f => {
       if (!f.hasVideo || !f.hasAudio) return false;
       const res = getRes(f.qualityLabel);
       return res === 0 || res <= 720;
     });
-    const videoOnly: typeof validFormats = [];
+    const videoOnly = validFormats.filter(f => {
+      if (!f.hasVideo || f.hasAudio) return false;
+      const res = getRes(f.qualityLabel);
+      return res === 0 || res <= 720;
+    });
     const audioOnly = validFormats.filter(f => !f.hasVideo && f.hasAudio);
 
     return NextResponse.json({

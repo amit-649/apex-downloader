@@ -199,7 +199,7 @@ export default function Home() {
   const [isSplitSelection, setIsSplitSelection] = useState(false);
   const [showAdvancedCodecs, setShowAdvancedCodecs] = useState(false);
 
-  // Filter formats — keep only progressive video (hasVideo && hasAudio) up to 720p/720p60 (no audio merge required)
+  // Filter formats — keep video formats up to 720p/720p60 (cap max resolution <= 720)
   const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean): YoutubeFormat[] => {
     if (!isVideo) {
       // Audio: return top 2 by bitrate
@@ -216,10 +216,10 @@ export default function Home() {
     };
 
     const filtered = formats.filter(f => {
-      if (!f.hasVideo || !f.hasAudio) return false;
+      if (!f.hasVideo) return false;
       const res = getRes(f.qualityLabel);
       if (res === 0 || res > 720) return false;
-      if (!showAdvancedCodecs) {
+      if (!showAdvancedCodecs && f.hasAudio) {
         const codec = (f.vcodec || f.acodec || '').toLowerCase();
         if (codec === 'vp9' || codec === 'av1' || codec === 'opus') return false;
       }
@@ -374,23 +374,20 @@ export default function Home() {
 
         setYtMetadata(data);
 
-        const defaultMerged = [...data.formats.videoWithAudio]
-          .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
+        // Select highest resolution format <= 720p
+        const allVids = [
+          ...data.formats.videoWithAudio,
+          ...data.formats.videoOnly,
+        ];
+        const defaultMerged = allVids.sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0];
+
         if (defaultMerged) {
+          const isSplit = defaultMerged.hasVideo && !defaultMerged.hasAudio;
           setSelectedVideoFormat(defaultMerged);
-          // IMPORTANT: a progressive (video+audio) format must go down the
-          // direct-download path. Explicitly reset the split flag here —
-          // otherwise a stale `true` from a previous selection forces even
-          // 360p/720p into the browser merge and fails.
-          setIsSplitSelection(false);
-        } else {
-          const bestVideo = [...data.formats.videoOnly]
-            .sort((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))[0] ?? null;
-          const bestAudio = [...data.formats.audioOnly]
-            .sort((a, b) => (b.audioBitrate ?? 0) - (a.audioBitrate ?? 0))[0] ?? null;
-          setSelectedVideoFormat(bestVideo);
-          setSelectedAudioFormat(bestAudio);
-          setIsSplitSelection(true);
+          setIsSplitSelection(isSplit);
+          if (isSplit && data.formats.audioOnly.length) {
+            setSelectedAudioFormat(data.formats.audioOnly[0]);
+          }
         }
       } else if (activeTab === 'instagram') {
         const res = await fetch(`/api/instagram?url=${encodeURIComponent(requestedUrl)}`);
@@ -403,7 +400,6 @@ export default function Home() {
         if (!res.ok) throw new Error(data.error || 'Failed to fetch Pinterest details');
         setPinMetadata(data);
       }
-      // Keep the fetched source separately so the input can be cleared for the next link.
       setSourceUrl(requestedUrl);
       setUrl('');
     } catch (error: unknown) {
@@ -451,22 +447,70 @@ export default function Home() {
     const title = ytMetadata?.title || 'YouTube_Video';
     const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
     const qualityLabel = selectedVideoFormat.qualityLabel || '';
-
-    // Direct stream proxy for standard progressive formats (≤720p60)
-    setDownloadStatus('handoff');
-    setStatusText('Your download is starting in the browser…');
-    logToConsole(`Requesting direct stream for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
-
     const isAudioOnly = !selectedVideoFormat.hasVideo;
-    const formatQuery = isAudioOnly ? '&format=mp3' : '';
+
+    // Strategy 1: Direct stream if format contains both video and audio, or is audio-only
+    if (selectedVideoFormat.hasAudio || isAudioOnly) {
+      setDownloadStatus('handoff');
+      setStatusText('Your download is starting in the browser…');
+      logToConsole(`Requesting direct stream for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
+
+      const formatQuery = isAudioOnly ? '&format=mp3' : '';
+
+      try {
+        window.location.href = `/api/youtube/stream?url=${encodeURIComponent(selectedVideoFormat.url)}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
+        logToConsole('Direct stream proxy requested.');
+        addToHistory(title, 'youtube', sourceUrl);
+      } catch (error: unknown) {
+        setDownloadStatus('failed');
+        const message = getErrorMessage(error, 'Stream download failed.');
+        setError(message);
+        logToConsole(`Error: ${message}`);
+      }
+      return;
+    }
+
+    // Strategy 2: Split video stream (720p / 720p60) -> Merge with audio
+    const audioFmt = selectedAudioFormat || ytMetadata?.formats?.audioOnly?.[0];
+    if (!audioFmt) {
+      setError('No audio stream available for merging with 720p video.');
+      return;
+    }
+
+    setDownloadStatus('handoff');
+    setStatusText('Downloading 720p video with audio...');
+    logToConsole(`Requesting 720p merge (video Itag ${selectedVideoFormat.itag} + audio Itag ${audioFmt.itag})...`);
 
     try {
-      window.location.href = `/api/youtube/stream?url=${encodeURIComponent(selectedVideoFormat.url)}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
-      logToConsole('Direct stream proxy requested.');
+      const mergerBaseUrl = process.env.NEXT_PUBLIC_MERGER_URL;
+      let targetUrl = '';
+      if (mergerBaseUrl) {
+        const mergerProxyUrl = `${window.location.origin}/api/youtube/merge-proxy`;
+        const params = new URLSearchParams({
+          url: sourceUrl,
+          height: '720',
+          title: cleanTitle,
+          videoItag: String(selectedVideoFormat.itag),
+          audioItag: String(audioFmt.itag),
+        });
+        targetUrl = `${mergerProxyUrl}?${params.toString()}`;
+      } else {
+        const params = new URLSearchParams({
+          action: 'merge',
+          url: sourceUrl,
+          videoItag: String(selectedVideoFormat.itag),
+          audioItag: String(audioFmt.itag),
+          title: cleanTitle,
+        });
+        targetUrl = `/api/youtube/download?${params.toString()}`;
+      }
+
+      window.location.href = targetUrl;
+      logToConsole('Merge request initiated.');
       addToHistory(title, 'youtube', sourceUrl);
     } catch (error: unknown) {
       setDownloadStatus('failed');
-      const message = getErrorMessage(error, 'Stream download failed.');
+      const message = getErrorMessage(error, '720p merge request failed.');
       setError(message);
       logToConsole(`Error: ${message}`);
     }
@@ -784,6 +828,7 @@ function YoutubeView({
 }) {
   const allFormats = [
     ...(meta.formats?.videoWithAudio || []),
+    ...(meta.formats?.videoOnly || []),
     ...(meta.formats?.audioOnly || []),
   ];
   const sd = getCompatibleFormats(allFormats, true);
