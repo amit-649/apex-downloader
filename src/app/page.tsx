@@ -201,7 +201,7 @@ export default function Home() {
 
   // Compatibility filter — only filter VP9/AV1/Opus from PROGRESSIVE formats when toggle is OFF
   // Split formats (videoOnly) are shown unfiltered since server merge handles all codecs
-  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean, isProgressive: boolean = false): YoutubeFormat[] => {
+  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean, isProgressive: boolean = false, maxHeight: number = Infinity): YoutubeFormat[] => {
     if (!isVideo) {
       // Audio: return top 2 by bitrate
       const sorted = [...formats].sort((a, b) => (b.audioBitrate || b.sizeBytes || 0) - (a.audioBitrate || a.sizeBytes || 0));
@@ -211,8 +211,18 @@ export default function Home() {
       return standard ? [best, standard] : [best];
     }
 
+    const getRes = (label: string) => {
+      const m = label.match(/(\d+)p/);
+      return m ? parseInt(m[1], 10) : 0;
+    };
+
     const filtered = formats.filter(f => {
       if (!f.hasVideo) return false;
+      // Skip formats without a parseable resolution (e.g. "Video" label)
+      const res = getRes(f.qualityLabel);
+      if (res === 0) return false;
+      // Cap resolution (e.g. 720 for HD section, Infinity for progressive)
+      if (res > maxHeight) return false;
       // Only filter advanced codecs from PROGRESSIVE formats when toggle is OFF
       // Split formats always show all codecs (server merge handles everything)
       if (!showAdvancedCodecs && isProgressive) {
@@ -224,10 +234,6 @@ export default function Home() {
 
     // Sort: highest resolution first, prefer MP4/H.264
     const sorted = filtered.sort((a, b) => {
-      const getRes = (label: string) => {
-        const m = label.match(/(\d+)p/);
-        return m ? parseInt(m[1], 10) : 0;
-      };
       const resDiff = getRes(b.qualityLabel) - getRes(a.qualityLabel);
       if (resDiff !== 0) return resDiff;
       const aMp4 = a.ext?.toLowerCase() === 'mp4';
@@ -819,7 +825,7 @@ function YoutubeView({
   selectedVideoFormat, isSplitSelection, selectYtFormat, onDownload, isBusy,
 }: {
   meta: YoutubeMetadata;
-  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean, isProgressive?: boolean) => YoutubeFormat[];
+  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean, isProgressive?: boolean, maxHeight?: number) => YoutubeFormat[];
   showAdvancedCodecs: boolean;
   setShowAdvancedCodecs: React.Dispatch<React.SetStateAction<boolean>>;
   selectedVideoFormat: YoutubeFormat | null;
@@ -834,8 +840,8 @@ function YoutubeView({
     ...(meta.formats?.videoOnly || []),
     ...(meta.formats?.audioOnly || []),
   ];
-  const hd = getCompatibleFormats(allFormats, true, false).filter(f => f.hasVideo && !f.hasAudio);
-  const sd = getCompatibleFormats(allFormats, true, true).filter(f => f.hasVideo && f.hasAudio);
+  const hd = getCompatibleFormats(allFormats, true, false, Infinity).filter(f => f.hasVideo && !f.hasAudio);
+  const sd = getCompatibleFormats(allFormats, true, true, 720).filter(f => f.hasVideo && f.hasAudio);
   const audio = getCompatibleFormats(allFormats, false);
 
   return (
