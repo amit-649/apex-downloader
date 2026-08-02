@@ -37,25 +37,12 @@ export function Header({
 
   return (
     <header className="site-header">
-      <div className="header-top-row">
-        <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
-          <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-            <ApexCanvasLogo size={32} isPinterest={isPinterest} />
-          </div>
-          <span className="brand-title">ApexDownloader</span>
-        </Link>
-
-        <div className="header-actions">
-          <button
-            className={`icon-btn ${showHistory ? activeClass : ''}`}
-            onClick={() => setShowHistory(!showHistory)}
-            title="Download History"
-            aria-label="Download History"
-          >
-            <History size={18} />
-          </button>
+      <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
+        <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
+          <ApexCanvasLogo size={32} isPinterest={isPinterest} />
         </div>
-      </div>
+        <span className="brand-title">ApexDownloader</span>
+      </Link>
 
       <nav className="nav-links">
         <Link
@@ -73,6 +60,17 @@ export function Header({
           <span>Pinterest</span>
         </Link>
       </nav>
+
+      <div className="header-actions">
+        <button
+          className={`icon-btn ${showHistory ? activeClass : ''}`}
+          onClick={() => setShowHistory(!showHistory)}
+          title="Download History"
+          aria-label="Download History"
+        >
+          <History size={18} />
+        </button>
+      </div>
     </header>
   );
 }

@@ -126,19 +126,13 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1.25rem;
   margin-bottom: 2rem;
   padding: 0.75rem 1.25rem;
   background: #FFFFFF;
   border-radius: var(--radius-lg);
   border: 1px solid var(--card-border);
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-}
-
-.header-top-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: auto;
 }
 
 .brand-link {
@@ -253,11 +247,13 @@ body::after {
 
 .nav-links {
   display: flex;
+  align-items: center;
   gap: 0.25rem;
   background: #F1F5F9;
   padding: 4px;
   border-radius: 14px;
   border: 1px solid #E2E8F0;
+  margin-left: auto;
 }
 
 .nav-link {
@@ -754,18 +750,41 @@ body::after {
   }
 
   .site-header {
-    flex-direction: column;
-    gap: 0.75rem;
-    padding: 0.85rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand actions"
+      "nav nav";
+    gap: 0.75rem 1rem;
+    padding: 0.85rem 1rem;
   }
 
-  .header-top-row {
-    width: 100%;
+  .brand-link {
+    grid-area: brand;
+  }
+
+  .header-actions {
+    grid-area: actions;
   }
 
   .nav-links {
+    grid-area: nav;
     width: 100%;
+    margin-left: 0;
+    display: flex;
+    gap: 4px;
+    background: #F1F5F9;
+    padding: 4px;
+    border-radius: 14px;
+    border: 1px solid #E2E8F0;
+  }
+
+  .nav-link {
+    flex: 1;
     justify-content: center;
+    text-align: center;
+    padding: 0.55rem 0.5rem;
+    border-radius: 10px;
   }
 
   .hero h1 {
