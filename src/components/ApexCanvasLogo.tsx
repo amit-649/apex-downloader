@@ -51,16 +51,27 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
               <stop offset="100%" stopColor="#7928CA" />
             </linearGradient>
           )}
+
+          <filter id="neonBlurGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.2" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
-        {/* === SHAPE 0: Authentic Apex 'A' Monogram (Exact Commit a5d9ddc Path) === */}
+        {/* === SHAPE 0: Authentic Apex 'A' Chevron Frame (Exact Commit 32b92b2) === */}
         <g className="vector-shape shape-apex">
           <path
-            d="M12 2 L2 18 h4.5 L12 9.5 L17.5 18 H22 Z"
+            d="M12 2 L2.2 18 h4.8 L12 9.5 L17 18 H21.8 Z"
             fill={`url(#${gradId})`}
+            fillOpacity="0.25"
             stroke={`url(#${gradId})`}
-            strokeWidth="0.5"
+            strokeWidth="2"
+            filter="url(#neonBlurGlow)"
           />
+          <path d="M12 9.5 L7 18 h10 Z" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
         </g>
 
         {/* === SHAPE 1: Perfectly Symmetrical Infinity 8 Symbol === */}
@@ -70,17 +81,27 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
             stroke={`url(#${gradId})`}
             strokeWidth="2.6"
             fill="none"
+            filter="url(#neonBlurGlow)"
+          />
+          <path
+            d={infinityPath}
+            stroke="#FFFFFF"
+            strokeWidth="1.3"
+            fill="none"
           />
         </g>
 
         {/* === SHAPE 2: Full Sharp Download Arrow Stem + Arrowhead + Tray Line === */}
         <g className="vector-shape shape-download">
-          {/* Vertical Shaft */}
-          <path d="M12 2.5 V13.5" stroke={`url(#${gradId})`} strokeWidth="2.6" />
+          {/* Arrow Stem */}
+          <path d="M12 3.5 v10.5" stroke={`url(#${gradId})`} strokeWidth="2.8" filter="url(#neonBlurGlow)" />
+          <path d="M12 3.5 v10.5" stroke="#FFFFFF" strokeWidth="1.4" />
           {/* Arrowhead Chevron */}
-          <path d="M7 9 L12 14 L17 9" stroke={`url(#${gradId})`} strokeWidth="2.6" />
-          {/* Bottom Media Tray */}
-          <path d="M4.5 19.5 H19.5" stroke={`url(#${gradId})`} strokeWidth="2.6" />
+          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke={`url(#${gradId})`} strokeWidth="2.8" filter="url(#neonBlurGlow)" />
+          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke="#FFFFFF" strokeWidth="1.4" />
+          {/* Bottom Tray Line */}
+          <path d="M5 19.5 h14" stroke={`url(#${gradId})`} strokeWidth="2.5" filter="url(#neonBlurGlow)" />
+          <path d="M5 19.5 h14" stroke="#FFFFFF" strokeWidth="1.3" />
         </g>
       </svg>
     </div>
