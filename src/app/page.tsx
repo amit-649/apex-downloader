@@ -452,18 +452,24 @@ export default function Home() {
     const title = ytMetadata?.title || 'YouTube_Video';
     const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
 
-    // Scenario A: pre-merged or audio-only (browser handoff)
-    if (!isSplitSelection) {
+    // Extract height to determine download strategy
+    const qualityLabel = selectedVideoFormat.qualityLabel || '';
+    let height = parseInt(qualityLabel) || 360;
+    if (qualityLabel.toLowerCase().includes('4k')) height = 2160;
+    if (qualityLabel.toLowerCase().includes('8k')) height = 4320;
+
+    // Strategy 1: ≤720p → ALWAYS direct download (no browser merge)
+    if (height <= 720 || !isSplitSelection) {
       setDownloadStatus('handoff');
       setStatusText('Your download is starting in the browser…');
-      logToConsole(`Requesting download for itag ${selectedVideoFormat.itag}...`);
+      logToConsole(`Requesting direct download for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
 
       const isAudioOnly = !selectedVideoFormat.hasVideo;
       const formatQuery = isAudioOnly && !showAdvancedCodecs ? '&format=mp3' : '';
 
       try {
         window.location.href = `/api/youtube/download?url=${encodeURIComponent(sourceUrl)}&itag=${selectedVideoFormat.itag}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
-        logToConsole('Direct stream download requested. Handed over to browser downloader.');
+        logToConsole('Direct stream download requested.');
         addToHistory(title, 'youtube', sourceUrl);
       } catch (error: unknown) {
         setDownloadStatus('failed');
@@ -474,27 +480,15 @@ export default function Home() {
       return;
     }
 
-    // Optional fallback: live server-side merge (Render / Fly.io).
-    // DISABLED by default — Render's datacenter IP is bot-flagged by YouTube,
-    // so its yt-dlp cannot extract 1080p+ formats (verified via /diag). The
-    // reliable path for 1080p+ is the client-side WASM merge below. To force
-    // the server merger, append ?useMerge=1 to the page URL.
+    // Strategy 2: >720p (1080p, 4K) → Server-side merge via Render microservice
     const mergerBaseUrl = process.env.NEXT_PUBLIC_MERGER_URL;
-    const forceMerge = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('useMerge') === '1';
-    if (mergerBaseUrl && forceMerge) {
+    if (mergerBaseUrl) {
       if (!selectedAudioFormat) {
         setError('No compatible audio stream was found for this video.');
         return;
       }
       setDownloadStatus('handoff');
       setStatusText('Connecting to high-speed live stream merger...');
-
-      // Extract height from quality label (e.g. "1080p" → 1080, "4K" → 2160)
-      const qualityLabel = selectedVideoFormat.qualityLabel || '';
-      let height = parseInt(qualityLabel) || 1080;
-      if (qualityLabel.toLowerCase().includes('4k')) height = 2160;
-      if (qualityLabel.toLowerCase().includes('8k')) height = 4320;
-
       logToConsole(`Requesting ${height}p live stream merge via server...`);
 
       try {
@@ -510,7 +504,6 @@ export default function Home() {
           title: cleanTitle,
           videoItag: String(selectedVideoFormat.itag),
           audioItag: String(selectedAudioFormat.itag),
-          // Disable the raw stream-URL path (SSRF risk); the merger re-extracts from `url` itself.
           videoUrl: 'disabled',
           audioUrl: 'disabled',
         };
@@ -538,50 +531,8 @@ export default function Home() {
       return;
     }
 
-    // Scenario B: client-side chunk proxy + FFmpeg WASM merge (PRIMARY for 1080p+)
-    try {
-      if (!selectedAudioFormat) {
-        throw new Error('No compatible audio stream was found for this video.');
-      }
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
-      const videoSizeBytes = selectedVideoFormat.sizeBytes ?? 0;
-      const audioSizeBytes = selectedAudioFormat.sizeBytes ?? 0;
-
-      setDownloadStatus('downloading_video');
-      setStatusText('Downloading video stream in chunks...');
-      logToConsole('Starting client-side range-based video chunk proxy...');
-      logToConsole(`Video format: ${selectedVideoFormat.qualityLabel} | Size: ${videoSizeBytes > 0 ? (videoSizeBytes / (1024 * 1024)).toFixed(2) + ' MB' : 'Dynamic'}`);
-
-      const mergedBlob = await mergeVideoAndAudio(
-        selectedVideoFormat.url,
-        selectedAudioFormat.url,
-        videoSizeBytes,
-        audioSizeBytes,
-        (statusMsg: string, percent: number, speed: number) => {
-          setDownloadProgress(percent);
-          setStatusText(statusMsg);
-          if (speed > 0) setDownloadSpeed(speed);
-        },
-        abortController.signal
-      );
-
-      logToConsole('FFmpeg merge complete. Packaging output file.');
-      setDownloadStatus('completed');
-      setStatusText('Successfully merged and downloaded!');
-
-      triggerBlobDownload(mergedBlob, `${cleanTitle}.mp4`);
-      addToHistory(title, 'youtube', sourceUrl);
-      logToConsole('File successfully saved to your device!');
-    } catch (error: unknown) {
-      console.error('Error during client-side download/merge:', error);
-      setDownloadStatus('failed');
-      setStatusText('Download or Merge failed');
-      logToConsole(`Fatal Error: ${getErrorMessage(error, 'An error occurred.')}`);
-    } finally {
-      abortControllerRef.current = null;
-    }
+    // Fallback if NEXT_PUBLIC_MERGER_URL is not set
+    setError('Live stream merger is not configured for resolutions above 720p.');
   };
 
   // Direct downloader for Instagram / Pinterest
