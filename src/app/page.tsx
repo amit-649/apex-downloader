@@ -162,7 +162,7 @@ const PLATFORMS: { id: Platform; label: string; Icon: React.FC<{ size?: number }
 
 const EMPTY_HINTS: Record<Platform, { text: string; Icon: React.FC<{ size?: number }> }[]> = {
   youtube: [
-    { text: 'Video up to 4K', Icon: Video },
+    { text: 'Video up to 720p60', Icon: Video },
     { text: 'Audio only (M4A)', Icon: AudioLines },
     { text: 'youtube.com or youtu.be', Icon: Link2 },
   ],
@@ -199,9 +199,8 @@ export default function Home() {
   const [isSplitSelection, setIsSplitSelection] = useState(false);
   const [showAdvancedCodecs, setShowAdvancedCodecs] = useState(false);
 
-  // Compatibility filter — only filter VP9/AV1/Opus from PROGRESSIVE formats when toggle is OFF
-  // Split formats (videoOnly) are shown unfiltered since server merge handles all codecs
-  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean, isProgressive: boolean = false, maxHeight: number = Infinity, minHeight: number = 0): YoutubeFormat[] => {
+  // Filter formats — keep only progressive video (hasVideo && hasAudio) up to 720p/720p60 (no audio merge required)
+  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean): YoutubeFormat[] => {
     if (!isVideo) {
       // Audio: return top 2 by bitrate
       const sorted = [...formats].sort((a, b) => (b.audioBitrate || b.sizeBytes || 0) - (a.audioBitrate || a.sizeBytes || 0));
@@ -217,17 +216,10 @@ export default function Home() {
     };
 
     const filtered = formats.filter(f => {
-      if (!f.hasVideo) return false;
-      // Skip formats without a parseable resolution (e.g. "Video" label)
+      if (!f.hasVideo || !f.hasAudio) return false;
       const res = getRes(f.qualityLabel);
-      if (res === 0) return false;
-      // Cap resolution (e.g. 720 for Standard section)
-      if (res > maxHeight) return false;
-      // Floor resolution (e.g. 721 for High Definition section — only >720p)
-      if (res < minHeight) return false;
-      // Only filter advanced codecs from PROGRESSIVE formats when toggle is OFF
-      // Split formats always show all codecs (server merge handles everything)
-      if (!showAdvancedCodecs && isProgressive) {
+      if (res === 0 || res > 720) return false;
+      if (!showAdvancedCodecs) {
         const codec = (f.vcodec || f.acodec || '').toLowerCase();
         if (codec === 'vp9' || codec === 'av1' || codec === 'opus') return false;
       }
@@ -458,70 +450,26 @@ export default function Home() {
 
     const title = ytMetadata?.title || 'YouTube_Video';
     const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
-
-    // Extract height to determine download strategy
     const qualityLabel = selectedVideoFormat.qualityLabel || '';
-    let height = parseInt(qualityLabel) || 360;
-    if (qualityLabel.toLowerCase().includes('4k')) height = 2160;
-    if (qualityLabel.toLowerCase().includes('8k')) height = 4320;
 
-    // Strategy 1: ≤720p (or progressive) → Direct stream proxy
-    if (height <= 720 || !isSplitSelection) {
-      setDownloadStatus('handoff');
-      setStatusText('Your download is starting in the browser…');
-      logToConsole(`Requesting direct stream for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
+    // Direct stream proxy for standard progressive formats (≤720p60)
+    setDownloadStatus('handoff');
+    setStatusText('Your download is starting in the browser…');
+    logToConsole(`Requesting direct stream for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
 
-      const isAudioOnly = !selectedVideoFormat.hasVideo;
-      const formatQuery = isAudioOnly ? '&format=mp3' : '';
+    const isAudioOnly = !selectedVideoFormat.hasVideo;
+    const formatQuery = isAudioOnly ? '&format=mp3' : '';
 
-      try {
-        window.location.href = `/api/youtube/stream?url=${encodeURIComponent(selectedVideoFormat.url)}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
-        logToConsole('Direct stream proxy requested.');
-        addToHistory(title, 'youtube', sourceUrl);
-      } catch (error: unknown) {
-        setDownloadStatus('failed');
-        const message = getErrorMessage(error, 'Stream download failed.');
-        setError(message);
-        logToConsole(`Error: ${message}`);
-      }
-      return;
+    try {
+      window.location.href = `/api/youtube/stream?url=${encodeURIComponent(selectedVideoFormat.url)}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
+      logToConsole('Direct stream proxy requested.');
+      addToHistory(title, 'youtube', sourceUrl);
+    } catch (error: unknown) {
+      setDownloadStatus('failed');
+      const message = getErrorMessage(error, 'Stream download failed.');
+      setError(message);
+      logToConsole(`Error: ${message}`);
     }
-
-    // Strategy 2: >720p (1080p, 4K) → Server-side merge via Render microservice
-    const mergerBaseUrl = process.env.NEXT_PUBLIC_MERGER_URL;
-    if (mergerBaseUrl) {
-      if (!selectedAudioFormat) {
-        setError('No compatible audio stream was found for this video.');
-        return;
-      }
-      setDownloadStatus('handoff');
-      setStatusText('Connecting to high-speed live stream merger...');
-      logToConsole(`Requesting ${height}p live stream merge via server...`);
-
-      try {
-        const mergerProxyUrl = `${window.location.origin}/api/youtube/merge-proxy`;
-        const params = new URLSearchParams({
-          url: sourceUrl,
-          height: String(height),
-          title: cleanTitle,
-          videoItag: String(selectedVideoFormat.itag),
-          audioItag: String(selectedAudioFormat.itag),
-        });
-
-        window.location.href = `${mergerProxyUrl}?${params.toString()}`;
-        logToConsole('Server merge initiated via proxy.');
-        addToHistory(title, 'youtube', sourceUrl);
-      } catch (error: unknown) {
-        setDownloadStatus('failed');
-        const message = getErrorMessage(error, 'Live stream merger request failed.');
-        setError(message);
-        logToConsole(`Error: ${message}`);
-      }
-      return;
-    }
-
-    // Fallback if no merger configured
-    setError('Live stream merger is not configured for resolutions above 720p.');
   };
 
   // Direct downloader for Instagram / Pinterest
@@ -769,7 +717,6 @@ export default function Home() {
                 showAdvancedCodecs={showAdvancedCodecs}
                 setShowAdvancedCodecs={setShowAdvancedCodecs}
                 selectedVideoFormat={selectedVideoFormat}
-                isSplitSelection={isSplitSelection}
                 selectYtFormat={selectYtFormat}
                 onDownload={handleYoutubeDownload}
                 isBusy={isBusy}
@@ -824,26 +771,22 @@ export default function Home() {
    ================================================================ */
 function YoutubeView({
   meta, getCompatibleFormats, showAdvancedCodecs, setShowAdvancedCodecs,
-  selectedVideoFormat, isSplitSelection, selectYtFormat, onDownload, isBusy,
+  selectedVideoFormat, selectYtFormat, onDownload, isBusy,
 }: {
   meta: YoutubeMetadata;
-  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean, isProgressive?: boolean, maxHeight?: number, minHeight?: number) => YoutubeFormat[];
+  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean) => YoutubeFormat[];
   showAdvancedCodecs: boolean;
   setShowAdvancedCodecs: React.Dispatch<React.SetStateAction<boolean>>;
   selectedVideoFormat: YoutubeFormat | null;
-  isSplitSelection: boolean;
   selectYtFormat: (format: YoutubeFormat, isSplit: boolean) => void;
   onDownload: () => Promise<void>;
   isBusy: boolean;
 }) {
-  // Pass ALL formats to getCompatibleFormats — it does the filtering internally
   const allFormats = [
     ...(meta.formats?.videoWithAudio || []),
-    ...(meta.formats?.videoOnly || []),
     ...(meta.formats?.audioOnly || []),
   ];
-  const hd = getCompatibleFormats(allFormats, true, false, Infinity, 721).filter(f => f.hasVideo && !f.hasAudio);
-  const sd = getCompatibleFormats(allFormats, true, true, 720).filter(f => f.hasVideo && f.hasAudio);
+  const sd = getCompatibleFormats(allFormats, true);
   const audio = getCompatibleFormats(allFormats, false);
 
   return (
@@ -853,7 +796,7 @@ function YoutubeView({
           <Lock size={17} />
           <span>
             <strong>Limited mode:</strong> bot protection is active on this video, so it was fetched via mobile
-            emulation (360p). To unlock 1080p/4K, refresh the service authorization cookies and try again.
+            emulation (360p).
           </span>
         </div>
       )}
@@ -893,29 +836,8 @@ function YoutubeView({
             {sd.map((f, idx) => (
               <FormatCard
                 key={`${f.itag}-${idx}`}
-                selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
+                selected={selectedVideoFormat?.itag === f.itag}
                 onClick={() => selectYtFormat(f, false)}
-                title={f.qualityLabel}
-                badges={[
-                  f.fps ? { label: `${f.fps}fps` } : null,
-                  { label: `${f.ext} · ${f.vcodec}` },
-                ]}
-                size={fmtSize(f.sizeBytes)}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {hd.length > 0 && (
-        <>
-          <div className="subhead">High Definition · server merge</div>
-          <div className="format-grid">
-            {hd.map((f, idx) => (
-              <FormatCard
-                key={`${f.itag}-${idx}`}
-                selected={selectedVideoFormat?.itag === f.itag && isSplitSelection}
-                onClick={() => selectYtFormat(f, true)}
                 title={f.qualityLabel}
                 badges={[
                   f.fps ? { label: `${f.fps}fps` } : null,
@@ -950,7 +872,7 @@ function YoutubeView({
               return (
                 <FormatCard
                   key={`${f.itag}-${idx}`}
-                  selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
+                  selected={selectedVideoFormat?.itag === f.itag}
                   onClick={() => selectYtFormat(f, false)}
                   title={cardTitle}
                   badges={[
@@ -976,9 +898,6 @@ function YoutubeView({
         >
           <Download size={20} /> Download selected
         </button>
-        {isSplitSelection && (
-          <p className="cta-note">High-resolution streams are combined directly inside your browser — no server limits apply.</p>
-        )}
       </div>
     </div>
   );

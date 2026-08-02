@@ -53,9 +53,18 @@ export async function GET(request: Request) {
 
     const validFormats = formats.filter(f => f.ext !== 'mhtml');
 
-    // Group into videoWithAudio (progressive), videoOnly (split), audioOnly
-    const videoWithAudio = validFormats.filter(f => f.hasVideo && f.hasAudio);
-    const videoOnly = validFormats.filter(f => f.hasVideo && !f.hasAudio);
+    const getRes = (label: string) => {
+      const m = label.match(/(\d+)p/);
+      return m ? parseInt(m[1], 10) : 0;
+    };
+
+    // Group into videoWithAudio (progressive <= 720p/720p60, no merging needed) and audioOnly
+    const videoWithAudio = validFormats.filter(f => {
+      if (!f.hasVideo || !f.hasAudio) return false;
+      const res = getRes(f.qualityLabel);
+      return res === 0 || res <= 720;
+    });
+    const videoOnly: typeof validFormats = [];
     const audioOnly = validFormats.filter(f => !f.hasVideo && f.hasAudio);
 
     return NextResponse.json({
