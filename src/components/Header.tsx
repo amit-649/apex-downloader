@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { History, Settings } from 'lucide-react';
-import { ApexMorphLogo } from './ApexMorphLogo';
+import { ApexCanvasLogo } from './ApexCanvasLogo';
 
 const InstagramIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -43,7 +43,7 @@ export function Header({
     <header className="site-header">
       <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
         <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-          <ApexMorphLogo size={44} />
+          <ApexCanvasLogo size={46} />
         </div>
         <span className="brand-title">ApexDownloader</span>
       </Link>
