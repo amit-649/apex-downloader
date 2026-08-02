@@ -41,12 +41,33 @@ export function Header({
 
   return (
     <header className="site-header">
-      <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
-        <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-          <ApexCanvasLogo size={44} isPinterest={isPinterest} />
+      <div className="header-top-row">
+        <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
+          <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
+            <ApexCanvasLogo size={38} isPinterest={isPinterest} />
+          </div>
+          <span className="brand-title">ApexDownloader</span>
+        </Link>
+
+        <div className="header-actions">
+          <button
+            className={`icon-btn ${showHistory ? activeClass : ''}`}
+            onClick={() => { setShowHistory(!showHistory); setShowSettings(false); }}
+            title="Download History"
+            aria-label="Download History"
+          >
+            <History size={18} />
+          </button>
+          <button
+            className={`icon-btn ${showSettings ? activeClass : ''}`}
+            onClick={() => { setShowSettings(!showSettings); setShowHistory(false); }}
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Settings size={18} />
+          </button>
         </div>
-        <span className="brand-title">ApexDownloader</span>
-      </Link>
+      </div>
 
       <nav className="nav-links">
         <Link
@@ -64,25 +85,6 @@ export function Header({
           <span>Pinterest</span>
         </Link>
       </nav>
-
-      <div className="header-actions">
-        <button
-          className={`icon-btn ${showHistory ? activeClass : ''}`}
-          onClick={() => { setShowHistory(!showHistory); setShowSettings(false); }}
-          title="Download History"
-          aria-label="Download History"
-        >
-          <History size={18} />
-        </button>
-        <button
-          className={`icon-btn ${showSettings ? activeClass : ''}`}
-          onClick={() => { setShowSettings(!showSettings); setShowHistory(false); }}
-          title="Settings"
-          aria-label="Settings"
-        >
-          <Settings size={18} />
-        </button>
-      </div>
     </header>
   );
 }
