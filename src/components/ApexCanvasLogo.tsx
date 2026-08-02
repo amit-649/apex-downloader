@@ -91,17 +91,17 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
           />
         </g>
 
-        {/* === SHAPE 2: Unmistakable Download Arrow Stem + Chevron + Tray Line === */}
+        {/* === SHAPE 2: Razor-Sharp Unblurred Download Button Icon === */}
         <g className="vector-shape shape-download">
-          {/* Arrow Stem (Vertical Shaft) */}
-          <path d="M12 3 V13" stroke={`url(#${gradId})`} strokeWidth="2.8" strokeLinecap="round" fill="none" filter="url(#neonBlurGlow)" />
-          <path d="M12 3 V13" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-          {/* Arrowhead Chevron */}
-          <path d="M7.5 9.5 L12 14 L16.5 9.5" stroke={`url(#${gradId})`} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#neonBlurGlow)" />
-          <path d="M7.5 9.5 L12 14 L16.5 9.5" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          {/* Bottom Media Tray */}
-          <path d="M5 18.5 H19" stroke={`url(#${gradId})`} strokeWidth="2.6" strokeLinecap="round" fill="none" filter="url(#neonBlurGlow)" />
-          <path d="M5 18.5 H19" stroke="#FFFFFF" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+          {/* Outer Gradient Layer */}
+          <path d="M12 2.5 V13.5" stroke={`url(#${gradId})`} strokeWidth="3" strokeLinecap="round" fill="none" />
+          <path d="M6.5 9 L12 14.5 L17.5 9" stroke={`url(#${gradId})`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path d="M4.5 19 H19.5" stroke={`url(#${gradId})`} strokeWidth="3" strokeLinecap="round" fill="none" />
+
+          {/* Inner Crisp White High-Contrast Core */}
+          <path d="M12 2.5 V13.5" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" fill="none" />
+          <path d="M6.5 9 L12 14.5 L17.5 9" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path d="M4.5 19 H19.5" stroke="#FFFFFF" strokeWidth="1.2" strokeLinecap="round" fill="none" />
         </g>
       </svg>
     </div>
