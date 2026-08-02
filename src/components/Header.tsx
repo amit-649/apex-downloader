@@ -43,7 +43,7 @@ export function Header({
     <header className="site-header">
       <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
         <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-          <ApexMorphLogo size={30} />
+          <ApexMorphLogo size={44} />
         </div>
         <span className="brand-title">ApexDownloader</span>
       </Link>
