@@ -411,13 +411,12 @@ export default function Home() {
 
   const selectYtFormat = (format: YoutubeFormat, isSplit: boolean) => {
     setIsSplitSelection(isSplit);
+    setSelectedVideoFormat(format);
     if (isSplit) {
-      setSelectedVideoFormat(format);
-      if (!selectedAudioFormat && ytMetadata?.formats.audioOnly.length) {
+      if (ytMetadata?.formats.audioOnly.length) {
         setSelectedAudioFormat(ytMetadata.formats.audioOnly[0]);
       }
     } else {
-      setSelectedVideoFormat(format);
       setSelectedAudioFormat(null);
     }
   };
@@ -876,13 +875,13 @@ function YoutubeView({
 
       {sd.length > 0 && (
         <>
-          <div className="subhead">Standard · direct download</div>
+          <div className="subhead">Standard Video Quality (up to 720p60)</div>
           <div className="format-grid">
             {sd.map((f, idx) => (
               <FormatCard
                 key={`${f.itag}-${idx}`}
                 selected={selectedVideoFormat?.itag === f.itag}
-                onClick={() => selectYtFormat(f, false)}
+                onClick={() => selectYtFormat(f, !f.hasAudio)}
                 title={f.qualityLabel}
                 badges={[
                   f.fps ? { label: `${f.fps}fps` } : null,
