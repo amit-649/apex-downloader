@@ -250,10 +250,6 @@ export default function InstagramPage() {
       />
 
       <div className="hero insta-hero">
-        <div className="hero-badge">
-          <Sparkles size={13} />
-          <span>#1 Free Instagram Downloader • 1080p Full HD</span>
-        </div>
         <h1>Instagram Video &amp; Story Downloader</h1>
         <div className="hero-subtitle-rotating">
           <span>Your downloads,</span>

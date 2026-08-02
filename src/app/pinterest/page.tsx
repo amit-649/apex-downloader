@@ -213,10 +213,6 @@ export default function PinterestPage() {
       />
 
       <div className="hero pin-hero">
-        <div className="hero-badge">
-          <Sparkles size={13} />
-          <span>#1 Free Pinterest Media Downloader</span>
-        </div>
         <h1>Pinterest Video &amp; Image Downloader</h1>
         <div className="hero-subtitle-rotating">
           <span>Your downloads,</span>
