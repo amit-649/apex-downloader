@@ -1,28 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#a855f7" /> <!-- Purple -->
-      <stop offset="100%" stop-color="#3b82f6" /> <!-- Blue -->
-    </linearGradient>
-    <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="100%" stop-color="#dbeafe" /> <!-- Light blue-white -->
+    <linearGradient id="apex-grad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E1306C" />
+      <stop offset="50%" stop-color="#E60023" />
+      <stop offset="100%" stop-color="#833AB4" />
     </linearGradient>
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feGaussianBlur stdDeviation="16" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
 
-  <!-- Glowing background ring -->
-  <circle cx="256" cy="256" r="190" fill="none" stroke="url(#ringGrad)" stroke-width="32" filter="url(#glow)" opacity="0.5" />
-  
-  <!-- Main sharp ring -->
-  <circle cx="256" cy="256" r="190" fill="none" stroke="url(#ringGrad)" stroke-width="24" />
+  <!-- Background Squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#apex-grad)" />
 
-  <!-- Down Arrow -->
+  <!-- Download Arrow Icon -->
   <g filter="url(#glow)">
-    <!-- Custom clean down arrow path -->
-    <path d="M256 370 L140 240 H215 V140 H297 V240 H372 Z" fill="url(#arrowGrad)" />
+    <!-- Main Arrow Stem & Head -->
+    <path d="M256 120 V300 M170 214 L256 300 L342 214" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Bottom Tray -->
+    <path d="M140 376 H372" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" />
+    <!-- Sparkle Accent -->
+    <path d="M370 140 L380 165 L405 175 L380 185 L370 210 L360 185 L335 175 L360 165 Z" fill="#FFDF7B" />
   </g>
 </svg>
