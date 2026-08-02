@@ -2,41 +2,60 @@
 
 import React, { useState, useEffect } from 'react';
 
-export function ApexMorphLogo({ size = 22 }: { size?: number }) {
-  // state: 'apexA' | 'download'
-  const [isDownloadSymbol, setIsDownloadSymbol] = useState(false);
+export function ApexMorphLogo({ size = 24 }: { size?: number }) {
+  // state: 0 = Apex 'A' with Infinity 8 Loop, 1 = Apex 'A' morphed into Download Symbol
+  const [isDownloadState, setIsDownloadState] = useState(false);
 
   useEffect(() => {
-    // Toggles state every 3 seconds (3000ms)
+    // 3.0 seconds stay time before morphing
     const interval = setInterval(() => {
-      setIsDownloadSymbol((prev) => !prev);
+      setIsDownloadState((prev) => !prev);
     }, 3000);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="apex-morph-wrapper" title="ApexDownloader">
+    <div className="apex-authentic-logo-wrapper" title="ApexDownloader">
       <svg
         width={size}
         height={size}
         viewBox="0 0 24 24"
-        fill="currentColor"
-        className={`apex-morph-svg ${isDownloadSymbol ? 'state-download' : 'state-apex-a'}`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`apex-authentic-svg ${isDownloadState ? 'state-download' : 'state-infinity'}`}
         aria-hidden="true"
       >
-        {/* === STATE 1: Iconic Apex 'A' Monogram (From Reference) === */}
-        <g className="shape-apex-a">
-          {/* Main Sharp Apex A Chevron Monogram */}
-          <path d="M12 2.5 L2.5 17.5 H7.5 L12 10 L16.5 17.5 H21.5 Z" />
+        {/* === ALWAYS PRESENT: Authentic Apex 'A' Outer Frame (From Reference Image) === */}
+        <path
+          d="M12 2 L2 18 h4.5 L12 9.5 L17.5 18 H22 Z"
+          className="apex-outer-frame"
+          fill="currentColor"
+          fillOpacity="0.15"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+
+        {/* === INNER MORPHING STATE 1: Figure-8 Infinity Loop (∞) === */}
+        <g className="inner-infinity-group">
+          <path
+            d="M12 12c-1.8-1.8-4-2.5-5.5-1s-1.5 4 0.5 5.2 5-1.2 5-2.2c0-1 3.2-3.8 5-2.2s2 4.2-0.5 5.2S12 13 12 12z"
+            className="infinity-8-path"
+            strokeWidth="1.6"
+          />
         </g>
 
-        {/* === STATE 2: High-Speed Download Symbol (↓) === */}
-        <g className="shape-download">
-          {/* Downward Arrow Stem */}
-          <path d="M10.25 3 H13.75 V11 H17.5 L12 17 L6.5 11 H10.25 Z" />
+        {/* === INNER MORPHING STATE 2: Download Arrow Symbol (↓) === */}
+        <g className="inner-download-group">
+          {/* Central Down Arrow Stem */}
+          <path d="M12 6.5 v8.5" strokeWidth="2.2" />
+          {/* Arrowhead Chevron */}
+          <path d="m8.5 11.5 3.5 3.5 3.5-3.5" strokeWidth="2.2" />
           {/* Bottom Media Tray */}
-          <rect x="4" y="19" width="16" height="2.8" rx="1.4" />
+          <path d="M7 18.5 h10" strokeWidth="2" />
         </g>
       </svg>
     </div>

@@ -18,8 +18,13 @@
   <!-- Outer Neon Border Ring -->
   <rect x="12" y="12" width="488" height="488" rx="128" stroke="url(#apexGrad)" stroke-width="12" stroke-opacity="0.6" fill="none" filter="url(#neonGlow)" />
 
-  <!-- Iconic Apex 'A' Monogram Emblem (From Reference Image) -->
+  <!-- Authentic Apex 'A' Outer Frame + Interlocking Infinity 8 Loop -->
   <g filter="url(#neonGlow)">
-    <path d="M256 70 L60 380 H160 L256 220 L352 380 H452 Z" fill="url(#apexGrad)" />
+    <!-- Apex Outer Shell Frame -->
+    <path d="M256 60 L60 380 H150 L256 210 L362 380 H452 Z" fill="url(#apexGrad)" opacity="0.95" />
+    
+    <!-- Inner Figure-8 Infinity Loop -->
+    <path d="M256 280 c-35-35 -85-50 -115-20 s-10 80 40 100 s80-45 80-80 c0-35 35-80 80-80 s80 50 50 80 s-80 45-80 0" 
+          stroke="#FFFFFF" stroke-width="26" stroke-linecap="round" fill="none" />
   </g>
 </svg>
