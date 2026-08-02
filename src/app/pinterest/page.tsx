@@ -44,7 +44,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function PinterestPage() {
-  const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -208,8 +207,6 @@ export default function PinterestPage() {
       <Header
         showHistory={showHistory}
         setShowHistory={setShowHistory}
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
       />
 
       <div className="hero pin-hero">
@@ -243,14 +240,6 @@ export default function PinterestPage() {
         </div>
       )}
 
-      {showSettings && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div className="section-title" style={{ marginBottom: '0.5rem' }}>Pinterest Direct Proxy Extraction</div>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            Retrieves original uncompressed media directly from Pinterest CDN servers for high-speed direct downloads.
-          </p>
-        </div>
-      )}
 
       <main className="card">
         <div className="input-group">

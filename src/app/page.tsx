@@ -58,7 +58,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function InstagramPage() {
-  const [showSettings, setShowSettings] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -245,8 +244,6 @@ export default function InstagramPage() {
       <Header
         showHistory={showHistory}
         setShowHistory={setShowHistory}
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
       />
 
       <div className="hero insta-hero">
@@ -280,14 +277,6 @@ export default function InstagramPage() {
         </div>
       )}
 
-      {showSettings && (
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div className="section-title" style={{ marginBottom: '0.5rem' }}>Instagram Extraction Authorization</div>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            High-speed Instagram media downloads are processed securely via server-managed session credentials without storing data in your browser.
-          </p>
-        </div>
-      )}
 
       <main className="card">
         <div className="input-group">

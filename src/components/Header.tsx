@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { History, Settings } from 'lucide-react';
+import { History } from 'lucide-react';
 import { ApexCanvasLogo } from './ApexCanvasLogo';
 
 const InstagramIcon = ({ size = 16 }: { size?: number }) => (
@@ -27,13 +27,9 @@ const PinterestIcon = ({ size = 16 }: { size?: number }) => (
 export function Header({
   showHistory,
   setShowHistory,
-  showSettings,
-  setShowSettings,
 }: {
   showHistory: boolean;
   setShowHistory: (val: boolean) => void;
-  showSettings: boolean;
-  setShowSettings: (val: boolean) => void;
 }) {
   const pathname = usePathname();
   const isPinterest = pathname.startsWith('/pinterest');
@@ -44,7 +40,7 @@ export function Header({
       <div className="header-top-row">
         <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
           <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-            <ApexCanvasLogo size={38} isPinterest={isPinterest} />
+            <ApexCanvasLogo size={32} isPinterest={isPinterest} />
           </div>
           <span className="brand-title">ApexDownloader</span>
         </Link>
@@ -52,19 +48,11 @@ export function Header({
         <div className="header-actions">
           <button
             className={`icon-btn ${showHistory ? activeClass : ''}`}
-            onClick={() => { setShowHistory(!showHistory); setShowSettings(false); }}
+            onClick={() => setShowHistory(!showHistory)}
             title="Download History"
             aria-label="Download History"
           >
             <History size={18} />
-          </button>
-          <button
-            className={`icon-btn ${showSettings ? activeClass : ''}`}
-            onClick={() => { setShowSettings(!showSettings); setShowHistory(false); }}
-            title="Settings"
-            aria-label="Settings"
-          >
-            <Settings size={18} />
           </button>
         </div>
       </div>

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="ogBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#FAF7FC" />
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF007A" />
+      <stop offset="50%" stop-color="#E60023" />
+      <stop offset="100%" stop-color="#7928CA" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="24" flood-color="#000000" flood-opacity="0.06" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#ogBg)" />
+
+  <!-- Clean Card Container -->
+  <rect x="120" y="90" width="960" height="450" rx="32" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="2" filter="url(#shadow)" />
+
+  <!-- Logo Mark -->
+  <g transform="translate(180, 160)">
+    <path d="M40 10 L10 60 H24 L40 32 L56 60 H70 Z" fill="url(#brandGrad)" />
+    <path d="M40 32 L25 60 H55 Z" fill="none" stroke="#FFFFFF" stroke-width="3" />
+  </g>
+
+  <!-- Title -->
+  <text x="270" y="205" font-family="-apple-system, BlinkMacSystemFont, Inter, sans-serif" font-size="44" font-weight="800" fill="#0F172A" letter-spacing="-1">ApexDownloader</text>
+  <text x="270" y="240" font-family="-apple-system, BlinkMacSystemFont, Inter, sans-serif" font-size="20" font-weight="600" fill="#64748B">Free Instagram &amp; Pinterest Downloader</text>
+
+  <!-- Input Mockup -->
+  <rect x="180" y="290" width="840" height="72" rx="16" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="2" />
+  <text x="220" y="334" font-family="-apple-system, BlinkMacSystemFont, Inter, sans-serif" font-size="20" fill="#94A3B8">Paste Instagram Reel, Story, or Pinterest link...</text>
+
+  <rect x="850" y="300" width="160" height="52" rx="12" fill="url(#brandGrad)" />
+  <text x="902" y="333" font-family="-apple-system, BlinkMacSystemFont, Inter, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">Fetch</text>
+
+  <!-- Trust Badges -->
+  <text x="180" y="440" font-family="-apple-system, BlinkMacSystemFont, Inter, sans-serif" font-size="18" font-weight="600" fill="#475569">✓ 100% Free &amp; Private   •   ✓ 1080p Full HD MP4   •   ✓ No Account Required</text>
+</svg>
