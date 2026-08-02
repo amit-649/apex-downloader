@@ -126,12 +126,30 @@ async function fetchVisitorData() {
   }
 }
 
-async function extractInfo(url, cookieArgs) {
+async function extractInfoWithFallback(url, cookieArgs) {
   const visitorData = await fetchVisitorData();
-  const extractorArgs = [visitorData ? `youtube:visitor_data=${visitorData}` : '', 'youtube:player_client=ios,android,web'].filter(Boolean).join(',');
-  const args = [...cookieArgs, '--js-runtimes', JS_RUNTIME];
-  if (extractorArgs) args.push('--extractor-args', extractorArgs);
-  return runYtDlp([...args, url]);
+  const baseExtractorArgs = [visitorData ? `youtube:visitor_data=${visitorData}` : ''].filter(Boolean);
+
+  // 3-stage player client fallback (same as ytdlp.ts)
+  const attempts = [
+    { label: 'Standard', extraArgs: [...baseExtractorArgs, 'youtube:player_client=ios,android,web'] },
+    { label: 'iOS/Android/Web', extraArgs: [...baseExtractorArgs, 'youtube:player_client=ios,android,web'] },
+    { label: 'TV/mweb', extraArgs: [...baseExtractorArgs, 'youtube:player_client=tv,mweb'] },
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const args = [...cookieArgs, '--js-runtimes', JS_RUNTIME];
+      if (attempt.extraArgs.length) {
+        args.push('--extractor-args', attempt.extraArgs.join(','));
+      }
+      console.log(`[yt-dlp] Attempt: ${attempt.label}`);
+      return await runYtDlp([...args, url]);
+    } catch (e) {
+      console.warn(`[yt-dlp] ${attempt.label} failed:`, e.message);
+    }
+  }
+  throw new Error('All extraction attempts failed');
 }
 
 // ── Merge Endpoint ────────────────────────────────────────────────────────────
@@ -148,11 +166,17 @@ app.post('/merge', async (req, res) => {
     const cookieArgs = cookieFile ? ['--cookies', cookieFile] : [];
 
     // Extract fresh formats on Render's IP (bypasses Vercel IP lock)
-    const info = await extractInfo(url, cookieArgs);
+    const info = await extractInfoWithFallback(url, cookieArgs);
     const formats = info.formats || [];
 
-    // Select video format
-    let videoFormat = videoItag ? formats.find(f => String(f.format_id) === String(videoItag) && f.url) : null;
+    // Select video format — prioritize exact itag match, but ALWAYS fallback to resolution
+    let videoFormat = null;
+    if (videoItag) {
+      videoFormat = formats.find(f => String(f.format_id) === String(videoItag) && f.url);
+      if (!videoFormat) {
+        console.log(`[Merge] Exact video itag ${videoItag} not found in fresh extraction, falling back to resolution ${height}p`);
+      }
+    }
     if (!videoFormat) {
       videoFormat = formats
         .filter(f => f.vcodec && f.vcodec !== 'none' && f.url)
@@ -163,8 +187,14 @@ app.post('/merge', async (req, res) => {
         })[0];
     }
 
-    // Select audio format
-    let audioFormat = audioItag ? formats.find(f => String(f.format_id) === String(audioItag) && f.url) : null;
+    // Select audio format — same logic
+    let audioFormat = null;
+    if (audioItag) {
+      audioFormat = formats.find(f => String(f.format_id) === String(audioItag) && f.url);
+      if (!audioFormat) {
+        console.log(`[Merge] Exact audio itag ${audioItag} not found in fresh extraction, falling back to best audio`);
+      }
+    }
     if (!audioFormat) {
       audioFormat = formats
         .filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none') && f.url)
