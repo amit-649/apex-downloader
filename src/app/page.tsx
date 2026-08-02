@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 
 const SHOW_ADS = false; // Set to true when you want to enable sponsored banner placeholders!
-import { downloadInChunks } from '@/utils/downloader';
 
 /* ---------- Brand icons (Lucide dropped these) ---------- */
 const YoutubeIcon = ({ size = 18 }: { size?: number }) => (
