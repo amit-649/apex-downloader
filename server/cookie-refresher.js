@@ -20,13 +20,16 @@
  * sync_cookies.js.
  */
 
-const { chromium } = require('puppeteer-core');
+const puppeteer = require('puppeteer-core');
 const { neon } = require('@neondatabase/serverless');
 require('dotenv').config();
 
 // ── Config ──────────────────────────────────────────────────────────────
 const REFRESH_INTERVAL_MS = parseInt(process.env.COOKIE_REFRESH_INTERVAL_MS || '') || 6 * 60 * 60 * 1000; // 6h
 const MAX_CONCURRENT_REFRESH = 1; // dedupe on-demand calls
+
+// Chromium executable path (set by nixpacks/Dockerfile)
+const CHROMIUM_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
 
 // ── Neon helpers ───────────────────────────────────────────────────────
 function getDb() {
@@ -90,9 +93,9 @@ let browser = null;
 async function getBrowser() {
   if (browser && browser.isConnected()) return browser;
   console.log('[Refresher] Launching Chromium...');
-  browser = await chromium.launch({
+  browser = await puppeteer.launch({
     headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+    executablePath: CHROMIUM_PATH,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
