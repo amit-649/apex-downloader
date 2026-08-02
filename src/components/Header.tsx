@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { History, Settings } from 'lucide-react';
 
-const ApexLogo = ({ size = 20 }: { size?: number }) => (
+const ApexInfinityLogo = ({ size = 22 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 3v13" />
-    <path d="m6 10 6 6 6-6" />
-    <path d="M4 20h16" />
+    <path d="M6 16c-0.5-5 3-9 6-9s6.5 4 6 9" />
+    <path d="M12 7v8.5" />
+    <path d="m8 12.5 4 4 4-4" />
+    <path d="M6 19.5h12" />
   </svg>
 );
 
@@ -51,7 +52,7 @@ export function Header({
     <header className="site-header">
       <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
         <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-          <ApexLogo size={20} />
+          <ApexInfinityLogo size={22} />
         </div>
         <span className="brand-title">ApexDownloader</span>
       </Link>
