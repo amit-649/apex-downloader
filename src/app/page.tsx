@@ -223,7 +223,7 @@ export default function Home() {
     });
 
     // Sort: highest resolution first, prefer MP4/H.264
-    return filtered.sort((a, b) => {
+    const sorted = filtered.sort((a, b) => {
       const getRes = (label: string) => {
         const m = label.match(/(\d+)p/);
         return m ? parseInt(m[1], 10) : 0;
@@ -238,6 +238,16 @@ export default function Home() {
       if (aH264 !== bH264) return bH264 ? 1 : -1;
       return 0;
     });
+
+    // Dedupe by resolution: keep only one per qualityLabel (highest priority)
+    const deduped: YoutubeFormat[] = [];
+    const seen = new Set<string>();
+    for (const f of sorted) {
+      if (seen.has(f.qualityLabel)) continue;
+      seen.add(f.qualityLabel);
+      deduped.push(f);
+    }
+    return deduped;
   };
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {

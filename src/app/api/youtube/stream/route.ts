@@ -13,13 +13,14 @@ const BROWSER_HEADERS = {
   'Sec-Fetch-Dest': 'video',
 };
 
-function toWebStream(readable: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
-  return readable;
+function safeFilename(value: string): string {
+  return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 180) || 'video';
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const streamUrl = searchParams.get('url');
+  const title = searchParams.get('title') || 'video';
   const rangeHeader = request.headers.get('range');
 
   if (!streamUrl) {
@@ -48,27 +49,26 @@ export async function GET(request: Request) {
       );
     }
 
-    // Forward relevant headers
-    const responseHeaders = new Headers();
-    const allowedHeaders = [
-      'content-type',
-      'content-length',
-      'accept-ranges',
-      'content-range',
-      'content-disposition',
-      'cache-control',
-    ];
+    // Force download with proper Content-Disposition
+    const extension = mediaUrl.pathname.split('.').pop()?.split('?')[0] || 'mp4';
+    const filename = safeFilename(title);
+    const disposition = `attachment; filename="${filename}.${extension}"`;
 
-    for (const [key, value] of response.headers.entries()) {
-      if (allowedHeaders.includes(key.toLowerCase())) {
-        responseHeaders.set(key, value);
-      }
-    }
+    const responseHeaders = new Headers({
+      'Content-Type': response.headers.get('content-type') || 'video/mp4',
+      'Content-Disposition': disposition,
+      'Cache-Control': 'private, no-store',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Range',
+    });
 
-    // Ensure CORS for browser playback/download
-    responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Access-Control-Allow-Headers', 'Range');
-    responseHeaders.set('Cache-Control', 'private, no-store');
+    // Forward Range headers if present
+    const contentRange = response.headers.get('content-range');
+    if (contentRange) responseHeaders.set('Content-Range', contentRange);
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) responseHeaders.set('Content-Length', contentLength);
+    const acceptRanges = response.headers.get('accept-ranges');
+    if (acceptRanges) responseHeaders.set('Accept-Ranges', acceptRanges);
 
     return new Response(response.body, {
       status: response.status,
