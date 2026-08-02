@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 
 const SHOW_ADS = false; // Set to true when you want to enable sponsored banner placeholders!
-import { downloadInChunks, mergeVideoAndAudio } from '@/utils/downloader';
+import { downloadInChunks } from '@/utils/downloader';
 
 /* ---------- Brand icons (Lucide dropped these) ---------- */
 const YoutubeIcon = ({ size = 18 }: { size?: number }) => (
@@ -84,8 +84,9 @@ type YoutubeFormat = {
   itag: number | string;
   url: string;
   qualityLabel: string;
-  container: string;
-  codec: string;
+  ext: string;
+  vcodec: string;
+  acodec: string;
   hasVideo: boolean;
   hasAudio: boolean;
   fps: number | null;
@@ -202,7 +203,7 @@ export default function Home() {
   // Compatibility filter (MP4/H.264 prioritization & Audio streamlining)
   const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean): YoutubeFormat[] => {
     if (!isVideo) {
-      // Keep only top High Quality (~320kbps) and Standard (~140kbps) audio options
+      // Audio: return top 2 by bitrate
       const sorted = [...formats].sort((a, b) => (b.audioBitrate || b.sizeBytes || 0) - (a.audioBitrate || a.sizeBytes || 0));
       if (sorted.length === 0) return [];
       const best = sorted[0];
@@ -210,45 +211,33 @@ export default function Home() {
       return standard ? [best, standard] : [best];
     }
 
-    // Helper: filter out VP9/AV1/Opus when Advanced Codecs is OFF
-    const filterBasicCodecs = (formatList: YoutubeFormat[]): YoutubeFormat[] => {
-      if (showAdvancedCodecs) return formatList;
-      return formatList.filter(f => {
-        const codec = f.codec?.toLowerCase() || '';
-        return codec !== 'vp9' && codec !== 'av1' && codec !== 'opus';
-      });
-    };
+    // Video: return ALL video formats (both progressive and split)
+    // Filter out VP9/AV1/Opus when Advanced Codecs is OFF
+    const filtered = formats.filter(f => {
+      if (!f.hasVideo) return false;
+      if (!showAdvancedCodecs) {
+        const codec = (f.vcodec || f.acodec || '').toLowerCase();
+        if (codec === 'vp9' || codec === 'av1' || codec === 'opus') return false;
+      }
+      return true;
+    });
 
-    // ALWAYS return both progressive AND split formats
-    // "Advanced Codecs" toggle only filters out VP9/AV1/Opus from BOTH lists
-    const progressive = filterBasicCodecs(formats.filter(f => f.hasVideo && f.hasAudio));
-    const split = filterBasicCodecs(formats.filter(f => f.hasVideo && !f.hasAudio));
-
-    // Sort both: highest resolution first, prefer MP4/H.264
-    const sortByRes = (a: YoutubeFormat, b: YoutubeFormat) => {
+    // Sort: highest resolution first, prefer MP4/H.264
+    return filtered.sort((a, b) => {
       const getRes = (label: string) => {
         const m = label.match(/(\d+)p/);
         return m ? parseInt(m[1], 10) : 0;
       };
       const resDiff = getRes(b.qualityLabel) - getRes(a.qualityLabel);
       if (resDiff !== 0) return resDiff;
-      const aMp4 = a.container?.toLowerCase() === 'mp4';
-      const bMp4 = b.container?.toLowerCase() === 'mp4';
-      const aH264 = a.codec?.toLowerCase() === 'h.264';
-      const bH264 = b.codec?.toLowerCase() === 'h.264';
+      const aMp4 = a.ext?.toLowerCase() === 'mp4';
+      const bMp4 = b.ext?.toLowerCase() === 'mp4';
+      const aH264 = (a.vcodec || '').toLowerCase() === 'h.264';
+      const bH264 = (b.vcodec || '').toLowerCase() === 'h.264';
       if (aMp4 !== bMp4) return bMp4 ? 1 : -1;
       if (aH264 !== bH264) return bH264 ? 1 : -1;
       return 0;
-    };
-
-    if (isVideo) {
-      // For video tab, we need to differentiate progressive vs split for UI
-      // But we return both combined - UI uses hasAudio/hasVideo to separate
-      return [...progressive, ...split].sort(sortByRes);
-    }
-
-    // For audio tab - return progressive (already filtered)
-    return progressive.sort(sortByRes);
+    });
   };
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {
@@ -458,18 +447,18 @@ export default function Home() {
     if (qualityLabel.toLowerCase().includes('4k')) height = 2160;
     if (qualityLabel.toLowerCase().includes('8k')) height = 4320;
 
-    // Strategy 1: ≤720p → ALWAYS direct download (no browser merge)
+    // Strategy 1: ≤720p (or progressive) → Direct stream proxy
     if (height <= 720 || !isSplitSelection) {
       setDownloadStatus('handoff');
       setStatusText('Your download is starting in the browser…');
-      logToConsole(`Requesting direct download for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
+      logToConsole(`Requesting direct stream for ${qualityLabel} (itag ${selectedVideoFormat.itag})...`);
 
       const isAudioOnly = !selectedVideoFormat.hasVideo;
-      const formatQuery = isAudioOnly && !showAdvancedCodecs ? '&format=mp3' : '';
+      const formatQuery = isAudioOnly ? '&format=mp3' : '';
 
       try {
-        window.location.href = `/api/youtube/download?url=${encodeURIComponent(sourceUrl)}&itag=${selectedVideoFormat.itag}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
-        logToConsole('Direct stream download requested.');
+        window.location.href = `/api/youtube/stream?url=${encodeURIComponent(selectedVideoFormat.url)}&title=${encodeURIComponent(cleanTitle)}${formatQuery}`;
+        logToConsole('Direct stream proxy requested.');
         addToHistory(title, 'youtube', sourceUrl);
       } catch (error: unknown) {
         setDownloadStatus('failed');
@@ -492,35 +481,17 @@ export default function Home() {
       logToConsole(`Requesting ${height}p live stream merge via server...`);
 
       try {
-        const mergerBase = mergerBaseUrl.replace(/\/$/, '');
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `${mergerBase}/api/merge`;
-        form.target = '_self';
-
-        const fields: Record<string, string> = {
+        const mergerProxyUrl = `${window.location.origin}/api/youtube/merge-proxy`;
+        const params = new URLSearchParams({
           url: sourceUrl,
           height: String(height),
           title: cleanTitle,
           videoItag: String(selectedVideoFormat.itag),
           audioItag: String(selectedAudioFormat.itag),
-          videoUrl: 'disabled',
-          audioUrl: 'disabled',
-        };
+        });
 
-        for (const [key, val] of Object.entries(fields)) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = val;
-          form.appendChild(input);
-        }
-
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-
-        logToConsole('Live stream merge initiated. File download starting in browser!');
+        window.location.href = `${mergerProxyUrl}?${params.toString()}`;
+        logToConsole('Server merge initiated via proxy.');
         addToHistory(title, 'youtube', sourceUrl);
       } catch (error: unknown) {
         setDownloadStatus('failed');
@@ -531,7 +502,7 @@ export default function Home() {
       return;
     }
 
-    // Fallback if NEXT_PUBLIC_MERGER_URL is not set
+    // Fallback if no merger configured
     setError('Live stream merger is not configured for resolutions above 720p.');
   };
 
@@ -897,9 +868,30 @@ function YoutubeView({
         </label>
       </div>
 
+      {sd.length > 0 && (
+        <>
+          <div className="subhead">Standard · direct download</div>
+          <div className="format-grid">
+            {sd.map((f, idx) => (
+              <FormatCard
+                key={`${f.itag}-${idx}`}
+                selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
+                onClick={() => selectYtFormat(f, false)}
+                title={f.qualityLabel}
+                badges={[
+                  f.fps ? { label: `${f.fps}fps` } : null,
+                  { label: `${f.ext} · ${f.vcodec}` },
+                ]}
+                size={fmtSize(f.sizeBytes)}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
       {hd.length > 0 && (
         <>
-          <div className="subhead">High definition · split streams (merged in browser)</div>
+          <div className="subhead">High Definition · server merge</div>
           <div className="format-grid">
             {hd.map((f, idx) => (
               <FormatCard
@@ -909,26 +901,8 @@ function YoutubeView({
                 title={f.qualityLabel}
                 badges={[
                   f.fps ? { label: `${f.fps}fps` } : null,
-                  { label: `${f.container} · ${f.codec}` },
+                  { label: `${f.ext} · ${f.vcodec}` },
                 ]}
-                size={fmtSize(f.sizeBytes)}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {sd.length > 0 && (
-        <>
-          <div className="subhead">Standard · pre-merged (direct download)</div>
-          <div className="format-grid">
-            {sd.map((f, idx) => (
-              <FormatCard
-                key={`${f.itag}-${idx}`}
-                selected={selectedVideoFormat?.itag === f.itag && !isSplitSelection}
-                onClick={() => selectYtFormat(f, false)}
-                title={f.qualityLabel}
-                badges={[{ label: `${f.container} · ${f.codec}`, kind: 'success' }]}
                 size={fmtSize(f.sizeBytes)}
               />
             ))}
@@ -945,7 +919,7 @@ function YoutubeView({
             {audio.map((f, idx) => {
               const isBest = idx === 0;
               const badgeLabel = showAdvancedCodecs
-                ? `${f.container} · ${f.codec}`
+                ? `${f.ext} · ${f.acodec}`
                 : isBest
                 ? 'MP3 · High Quality (~320kbps)'
                 : 'MP3 · Standard (~140kbps)';

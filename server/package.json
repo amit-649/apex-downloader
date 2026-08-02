@@ -1,7 +1,7 @@
 {
-  "name": "apex-merger-service",
+  "name": "apex-merge-service",
   "version": "1.0.0",
-  "description": "High-performance native FFmpeg live stream merger microservice for ApexDownloader",
+  "description": "ApexDownloader Merge Service — FFmpeg server-side merge for YouTube split streams",
   "main": "server.js",
   "scripts": {
     "postinstall": "node -e \"if (require('fs').existsSync('./install-ytdlp.js')) require('./install-ytdlp.js')\"",
@@ -14,7 +14,6 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "fluent-ffmpeg": "^2.1.3",
-    "puppeteer-core": "^23.0.0"
+    "fluent-ffmpeg": "^2.1.3"
   }
 }
