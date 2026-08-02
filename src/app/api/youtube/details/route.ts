@@ -53,6 +53,11 @@ export async function GET(request: Request) {
 
     const validFormats = formats.filter(f => f.ext !== 'mhtml');
 
+    // Group into videoWithAudio (progressive), videoOnly (split), audioOnly
+    const videoWithAudio = validFormats.filter(f => f.hasVideo && f.hasAudio);
+    const videoOnly = validFormats.filter(f => f.hasVideo && !f.hasAudio);
+    const audioOnly = validFormats.filter(f => !f.hasVideo && f.hasAudio);
+
     return NextResponse.json({
       title: info.title,
       description: info.description || '',
@@ -61,7 +66,11 @@ export async function GET(request: Request) {
       authorUrl: info.uploader_url || info.channel_url || '',
       thumbnail: info.thumbnail || '',
       isRestricted: info.is_restricted || false,
-      formats: validFormats,
+      formats: {
+        videoWithAudio,
+        videoOnly,
+        audioOnly,
+      },
     });
   } catch (error: unknown) {
     console.error('Error fetching YouTube details:', error);
