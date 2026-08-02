@@ -53,11 +53,13 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
           )}
         </defs>
 
-        {/* === SHAPE 0: Previous Authentic Apex 'A' Monogram (Reverted Back) === */}
+        {/* === SHAPE 0: Authentic Apex 'A' Monogram (Exact Commit a5d9ddc Path) === */}
         <g className="vector-shape shape-apex">
           <path
-            d="M12 2.5 L2.5 17.5 H7.5 L12 10 L16.5 17.5 H21.5 Z"
+            d="M12 2 L2 18 h4.5 L12 9.5 L17.5 18 H22 Z"
             fill={`url(#${gradId})`}
+            stroke={`url(#${gradId})`}
+            strokeWidth="0.5"
           />
         </g>
 
