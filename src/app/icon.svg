@@ -16,9 +16,8 @@
   <rect width="512" height="512" rx="140" fill="#0A0915" />
   <rect x="16" y="16" width="480" height="480" rx="124" stroke="url(#apexBg)" stroke-width="12" stroke-opacity="0.6" fill="none" filter="url(#neonGlow)" />
 
-  <!-- Authentic Apex 'A' Monogram Emblem -->
+  <!-- Previous Authentic Apex 'A' Monogram Emblem (Reverted Back) -->
   <g filter="url(#neonGlow)">
-    <path d="M256 60 L60 380 H150 L256 210 L362 380 H452 Z" fill="url(#apexBg)" opacity="0.95" />
-    <path d="M256 210 L160 380 H352 Z" fill="none" stroke="#FFFFFF" stroke-width="20" />
+    <path d="M256 60 L60 380 H160 L256 220 L352 380 H452 Z" fill="url(#apexBg)" />
   </g>
 </svg>

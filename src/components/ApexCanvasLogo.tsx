@@ -48,21 +48,17 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
             <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#FF007A" />
               <stop offset="50%" stopColor="#E60023" />
-              <stop offset="100%" stop-color="#7928CA" />
+              <stop offset="100%" stopColor="#7928CA" />
             </linearGradient>
           )}
         </defs>
 
-        {/* === SHAPE 0: Authentic Apex 'A' Chevron Frame === */}
+        {/* === SHAPE 0: Previous Authentic Apex 'A' Monogram (Reverted Back) === */}
         <g className="vector-shape shape-apex">
           <path
-            d="M12 2 L2.2 18 h4.8 L12 9.5 L17 18 H21.8 Z"
+            d="M12 2.5 L2.5 17.5 H7.5 L12 10 L16.5 17.5 H21.5 Z"
             fill={`url(#${gradId})`}
-            fillOpacity="0.2"
-            stroke={`url(#${gradId})`}
-            strokeWidth="2.2"
           />
-          <path d="M12 9.5 L7 18 h10 Z" fill="none" stroke="#E60023" strokeWidth="1.5" />
         </g>
 
         {/* === SHAPE 1: Perfectly Symmetrical Infinity 8 Symbol === */}
