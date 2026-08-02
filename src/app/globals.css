@@ -178,8 +178,8 @@ body::after {
   box-shadow: 0 4px 15px var(--pin-glow);
 }
 
-/* ===== Morphing Logo Animation (Letter A <-> Download Arrow) ===== */
-.morph-logo-wrapper {
+/* ===== Morphing Logo Animation (Apex 'A' Chevron <-> Download Arrow) ===== */
+.apex-morph-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -188,38 +188,38 @@ body::after {
   height: 100%;
 }
 
-.morph-logo-svg {
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+.apex-morph-svg {
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.morph-logo-svg .path-group-a,
-.morph-logo-svg .path-group-download {
-  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+.apex-morph-svg .shape-apex-a,
+.apex-morph-svg .shape-download {
+  transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: center;
 }
 
-/* State 1: Letter A */
-.morph-logo-svg.state-a .path-group-a {
+/* State 1: Iconic Apex A Chevron */
+.apex-morph-svg.state-apex-a .shape-apex-a {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: scale(1) rotate(0deg);
 }
 
-.morph-logo-svg.state-a .path-group-download {
+.apex-morph-svg.state-apex-a .shape-download {
   opacity: 0;
-  transform: scale(0.7) translateY(-6px);
+  transform: scale(0.6) rotate(180deg);
   pointer-events: none;
 }
 
 /* State 2: Download Symbol */
-.morph-logo-svg.state-download .path-group-a {
+.apex-morph-svg.state-download .shape-apex-a {
   opacity: 0;
-  transform: scale(0.7) translateY(6px);
+  transform: scale(0.6) rotate(-180deg);
   pointer-events: none;
 }
 
-.morph-logo-svg.state-download .path-group-download {
+.apex-morph-svg.state-download .shape-download {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: scale(1) rotate(0deg);
 }
 
 .brand-title {
