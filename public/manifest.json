@@ -1,0 +1,17 @@
+{
+  "name": "ApexDownloader",
+  "short_name": "ApexDownloader",
+  "description": "Fast & Private Instagram and Pinterest Video & Photo Downloader",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#FFFFFF",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

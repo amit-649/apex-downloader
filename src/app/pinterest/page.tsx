@@ -19,6 +19,7 @@ import {
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { RotatingText } from '@/components/RotatingText';
+import { SkeletonLoader } from '@/components/SkeletonLoader';
 
 type DownloadStatus = 'idle' | 'fetching' | 'downloading_video' | 'completed' | 'failed';
 type MediaType = 'image' | 'video';
@@ -275,6 +276,8 @@ export default function PinterestPage() {
             <span>{error}</span>
           </div>
         )}
+
+        {loading && <SkeletonLoader />}
 
         {!meta && !loading && (
           <div className="hints-grid">
