@@ -199,8 +199,9 @@ export default function Home() {
   const [isSplitSelection, setIsSplitSelection] = useState(false);
   const [showAdvancedCodecs, setShowAdvancedCodecs] = useState(false);
 
-  // Compatibility filter (MP4/H.264 prioritization & Audio streamlining)
-  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean): YoutubeFormat[] => {
+  // Compatibility filter — only filter VP9/AV1/Opus from PROGRESSIVE formats when toggle is OFF
+  // Split formats (videoOnly) are shown unfiltered since server merge handles all codecs
+  const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean, isProgressive: boolean = false): YoutubeFormat[] => {
     if (!isVideo) {
       // Audio: return top 2 by bitrate
       const sorted = [...formats].sort((a, b) => (b.audioBitrate || b.sizeBytes || 0) - (a.audioBitrate || a.sizeBytes || 0));
@@ -210,11 +211,11 @@ export default function Home() {
       return standard ? [best, standard] : [best];
     }
 
-    // Video: return ALL video formats (both progressive and split)
-    // Filter out VP9/AV1/Opus when Advanced Codecs is OFF
     const filtered = formats.filter(f => {
       if (!f.hasVideo) return false;
-      if (!showAdvancedCodecs) {
+      // Only filter advanced codecs from PROGRESSIVE formats when toggle is OFF
+      // Split formats always show all codecs (server merge handles everything)
+      if (!showAdvancedCodecs && isProgressive) {
         const codec = (f.vcodec || f.acodec || '').toLowerCase();
         if (codec === 'vp9' || codec === 'av1' || codec === 'opus') return false;
       }
@@ -808,7 +809,7 @@ function YoutubeView({
   selectedVideoFormat, isSplitSelection, selectYtFormat, onDownload, isBusy,
 }: {
   meta: YoutubeMetadata;
-  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean) => YoutubeFormat[];
+  getCompatibleFormats: (formats: YoutubeFormat[], isVideo: boolean, isProgressive?: boolean) => YoutubeFormat[];
   showAdvancedCodecs: boolean;
   setShowAdvancedCodecs: React.Dispatch<React.SetStateAction<boolean>>;
   selectedVideoFormat: YoutubeFormat | null;
@@ -823,8 +824,8 @@ function YoutubeView({
     ...(meta.formats?.videoOnly || []),
     ...(meta.formats?.audioOnly || []),
   ];
-  const hd = getCompatibleFormats(allFormats, true).filter(f => f.hasVideo && !f.hasAudio);
-  const sd = getCompatibleFormats(allFormats, true).filter(f => f.hasVideo && f.hasAudio);
+  const hd = getCompatibleFormats(allFormats, true, false).filter(f => f.hasVideo && !f.hasAudio);
+  const sd = getCompatibleFormats(allFormats, true, true).filter(f => f.hasVideo && f.hasAudio);
   const audio = getCompatibleFormats(allFormats, false);
 
   return (
