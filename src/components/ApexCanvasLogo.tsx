@@ -61,7 +61,7 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
           </filter>
         </defs>
 
-        {/* === SHAPE 0: Authentic Apex 'A' Chevron Frame (Exact Commit 32b92b2) === */}
+        {/* === SHAPE 0: Authentic Apex 'A' Chevron Frame (Exact Commit 32b92b2 - UNTOUCHED) === */}
         <g className="vector-shape shape-apex">
           <path
             d="M12 2 L2.2 18 h4.8 L12 9.5 L17 18 H21.8 Z"
@@ -74,7 +74,7 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
           <path d="M12 9.5 L7 18 h10 Z" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
         </g>
 
-        {/* === SHAPE 1: Perfectly Symmetrical Infinity 8 Symbol === */}
+        {/* === SHAPE 1: Perfectly Symmetrical Infinity 8 Symbol (UNTOUCHED) === */}
         <g className="vector-shape shape-infinity">
           <path
             d={infinityPath}
@@ -91,17 +91,17 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
           />
         </g>
 
-        {/* === SHAPE 2: Full Sharp Download Arrow Stem + Arrowhead + Tray Line === */}
+        {/* === SHAPE 2: Unmistakable Download Arrow Stem + Chevron + Tray Line === */}
         <g className="vector-shape shape-download">
-          {/* Arrow Stem */}
-          <path d="M12 3.5 v10.5" stroke={`url(#${gradId})`} strokeWidth="2.8" filter="url(#neonBlurGlow)" />
-          <path d="M12 3.5 v10.5" stroke="#FFFFFF" strokeWidth="1.4" />
+          {/* Arrow Stem (Vertical Shaft) */}
+          <path d="M12 3 V13" stroke={`url(#${gradId})`} strokeWidth="2.8" strokeLinecap="round" fill="none" filter="url(#neonBlurGlow)" />
+          <path d="M12 3 V13" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" fill="none" />
           {/* Arrowhead Chevron */}
-          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke={`url(#${gradId})`} strokeWidth="2.8" filter="url(#neonBlurGlow)" />
-          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke="#FFFFFF" strokeWidth="1.4" />
-          {/* Bottom Tray Line */}
-          <path d="M5 19.5 h14" stroke={`url(#${gradId})`} strokeWidth="2.5" filter="url(#neonBlurGlow)" />
-          <path d="M5 19.5 h14" stroke="#FFFFFF" strokeWidth="1.3" />
+          <path d="M7.5 9.5 L12 14 L16.5 9.5" stroke={`url(#${gradId})`} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#neonBlurGlow)" />
+          <path d="M7.5 9.5 L12 14 L16.5 9.5" stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          {/* Bottom Media Tray */}
+          <path d="M5 18.5 H19" stroke={`url(#${gradId})`} strokeWidth="2.6" strokeLinecap="round" fill="none" filter="url(#neonBlurGlow)" />
+          <path d="M5 18.5 H19" stroke="#FFFFFF" strokeWidth="1.3" strokeLinecap="round" fill="none" />
         </g>
       </svg>
     </div>

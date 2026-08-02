@@ -7,18 +7,14 @@
     </linearGradient>
 
     <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feGaussianBlur stdDeviation="14" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
 
-  <!-- Dark Obsidian Squircle Backdrop -->
-  <rect width="512" height="512" rx="140" fill="#0A0915" />
-  <rect x="16" y="16" width="480" height="480" rx="124" stroke="url(#apexBg)" stroke-width="12" stroke-opacity="0.6" fill="none" filter="url(#neonGlow)" />
-
-  <!-- Authentic Apex 'A' Emblem (Exact Commit 32b92b2) -->
+  <!-- 100% Transparent Background Favicon Emblem -->
   <g filter="url(#neonGlow)">
-    <path d="M256 60 L60 380 H150 L256 210 L362 380 H452 Z" fill="url(#apexBg)" fill-opacity="0.25" stroke="url(#apexBg)" stroke-width="20" />
-    <path d="M256 210 L160 380 H352 Z" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linejoin="round" />
+    <path d="M256 40 L40 430 H140 L256 220 L372 430 H472 Z" fill="url(#apexBg)" fill-opacity="0.3" stroke="url(#apexBg)" stroke-width="24" stroke-linejoin="round" />
+    <path d="M256 220 L150 430 H362 Z" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linejoin="round" />
   </g>
 </svg>
