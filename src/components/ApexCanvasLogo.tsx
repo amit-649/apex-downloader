@@ -39,13 +39,13 @@ export function ApexCanvasLogo({ size = 36, isPinterest = false }: { size?: numb
       >
         <defs>
           {isPinterest ? (
-            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id={gradId} x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#FF4D6D" />
               <stop offset="50%" stopColor="#E60023" />
               <stop offset="100%" stopColor="#B3001B" />
             </linearGradient>
           ) : (
-            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id={gradId} x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="#FF007A" />
               <stop offset="50%" stopColor="#E60023" />
               <stop offset="100%" stopColor="#7928CA" />
