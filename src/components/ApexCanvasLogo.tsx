@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
+export function ApexCanvasLogo({ size = 44, isPinterest = false }: { size?: number; isPinterest?: boolean }) {
   // state: 0 = Apex 'A', 1 = Infinity 8 Loop, 2 = Download Arrow
   const [activeState, setActiveState] = useState<0 | 1 | 2>(0);
 
@@ -17,6 +17,9 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
 
   // 100% Mathematically Symmetrical Lemniscate Infinity Symbol Path
   const infinityPath = "M 12 12 C 9.2 7.5, 3.8 7.5, 3.8 12 C 3.8 16.5, 9.2 16.5, 12 12 C 14.8 7.5, 20.2 7.5, 20.2 12 C 20.2 16.5, 14.8 16.5, 12 12 Z";
+
+  const gradId = isPinterest ? "pinBrandGrad" : "instaBrandGrad";
+  const glowColor = isPinterest ? "#E60023" : "#FF007A";
 
   return (
     <div className="apex-crisp-logo-container" style={{ width: size, height: size }} title="ApexDownloader">
@@ -35,11 +38,19 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
         aria-hidden="true"
       >
         <defs>
-          <linearGradient id="neonBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#FF007A" />
-            <stop offset="50%" stopColor="#E60023" />
-            <stop offset="100%" stopColor="#7928CA" />
-          </linearGradient>
+          {isPinterest ? (
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FF4D6D" />
+              <stop offset="50%" stopColor="#E60023" />
+              <stop offset="100%" stopColor="#B3001B" />
+            </linearGradient>
+          ) : (
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FF007A" />
+              <stop offset="50%" stopColor="#E60023" />
+              <stop offset="100%" stopColor="#7928CA" />
+            </linearGradient>
+          )}
 
           <filter id="neonBlurGlow" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="1.2" result="blur" />
@@ -54,9 +65,9 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
         <g className="vector-shape shape-apex">
           <path
             d="M12 2 L2.2 18 h4.8 L12 9.5 L17 18 H21.8 Z"
-            fill="url(#neonBrandGrad)"
+            fill={`url(#${gradId})`}
             fillOpacity="0.25"
-            stroke="url(#neonBrandGrad)"
+            stroke={`url(#${gradId})`}
             strokeWidth="2"
             filter="url(#neonBlurGlow)"
           />
@@ -67,7 +78,7 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
         <g className="vector-shape shape-infinity">
           <path
             d={infinityPath}
-            stroke="url(#neonBrandGrad)"
+            stroke={`url(#${gradId})`}
             strokeWidth="2.6"
             fill="none"
             filter="url(#neonBlurGlow)"
@@ -83,13 +94,13 @@ export function ApexCanvasLogo({ size = 44 }: { size?: number }) {
         {/* === SHAPE 2: Perfect Sharp Download Arrow + Tray (Frame 00:08) === */}
         <g className="vector-shape shape-download">
           {/* Arrow Stem */}
-          <path d="M12 3.5 v10.5" stroke="url(#neonBrandGrad)" strokeWidth="2.8" filter="url(#neonBlurGlow)" />
+          <path d="M12 3.5 v10.5" stroke={`url(#${gradId})`} strokeWidth="2.8" filter="url(#neonBlurGlow)" />
           <path d="M12 3.5 v10.5" stroke="#FFFFFF" strokeWidth="1.4" />
           {/* Arrowhead Chevron */}
-          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke="url(#neonBrandGrad)" strokeWidth="2.8" filter="url(#neonBlurGlow)" />
+          <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke={`url(#${gradId})`} strokeWidth="2.8" filter="url(#neonBlurGlow)" />
           <path d="m7.5 10.5 4.5 4.5 4.5-4.5" stroke="#FFFFFF" strokeWidth="1.4" />
           {/* Bottom Tray Line */}
-          <path d="M5 19.5 h14" stroke="url(#neonBrandGrad)" strokeWidth="2.5" filter="url(#neonBlurGlow)" />
+          <path d="M5 19.5 h14" stroke={`url(#${gradId})`} strokeWidth="2.5" filter="url(#neonBlurGlow)" />
           <path d="M5 19.5 h14" stroke="#FFFFFF" strokeWidth="1.3" />
         </g>
       </svg>
