@@ -219,6 +219,41 @@ body::after {
   box-shadow: 0 2px 10px rgba(230, 0, 35, 0.2);
 }
 
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.icon-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--card-border-hover);
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.icon-btn.active-insta {
+  background: rgba(225, 48, 108, 0.18);
+  border-color: rgba(225, 48, 108, 0.4);
+  color: #f472b6;
+  box-shadow: 0 0 12px rgba(225, 48, 108, 0.25);
+}
+
+.icon-btn.active-pin {
+  background: rgba(230, 0, 35, 0.18);
+  border-color: rgba(230, 0, 35, 0.4);
+  color: #f87171;
+  box-shadow: 0 0 12px rgba(230, 0, 35, 0.25);
+}
+
 /* ===== Hero Section ===== */
 .hero {
   text-align: center;

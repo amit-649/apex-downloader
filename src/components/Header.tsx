@@ -36,6 +36,7 @@ export function Header({
 }) {
   const pathname = usePathname();
   const isPinterest = pathname.startsWith('/pinterest');
+  const activeClass = isPinterest ? 'active-pin' : 'active-insta';
 
   return (
     <header className="site-header">
@@ -65,16 +66,18 @@ export function Header({
 
       <div style={{ display: 'flex', gap: '0.5rem' }}>
         <button
-          className={`icon-btn ${showHistory ? 'active' : ''}`}
+          className={`icon-btn ${showHistory ? activeClass : ''}`}
           onClick={() => { setShowHistory(!showHistory); setShowSettings(false); }}
-          title="Download history"
+          title="Download History"
+          aria-label="Download History"
         >
           <History size={18} />
         </button>
         <button
-          className={`icon-btn ${showSettings ? 'active' : ''}`}
+          className={`icon-btn ${showSettings ? activeClass : ''}`}
           onClick={() => { setShowSettings(!showSettings); setShowHistory(false); }}
           title="Settings"
+          aria-label="Settings"
         >
           <Settings size={18} />
         </button>
