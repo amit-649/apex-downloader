@@ -212,51 +212,46 @@ export default function Home() {
 
     // When Advanced Codecs is OFF (default): return progressive formats only (direct download)
     if (!showAdvancedCodecs) {
-      // Filter to only progressive (video+audio) formats and dedupe by quality
+      // Filter to only progressive (video+audio) formats
+      // Keep ALL progressive formats — don't dedupe aggressively, let user choose
       const progressive = formats.filter(f => f.hasVideo && f.hasAudio);
-      const grouped = new Map<string, YoutubeFormat>();
-      for (const f of progressive) {
-        const key = `${f.qualityLabel}-${f.fps || ''}`;
-        const existing = grouped.get(key);
-        if (!existing) {
-          grouped.set(key, f);
-        } else {
-          // Prefer MP4/H.264
-          const existingIsMp4 = existing.container?.toLowerCase() === 'mp4';
-          const currentIsMp4 = f.container?.toLowerCase() === 'mp4';
-          const existingIsH264 = existing.codec?.toLowerCase() === 'h.264';
-          const currentIsH264 = f.codec?.toLowerCase() === 'h.264';
-          if (currentIsMp4 && !existingIsMp4) {
-            grouped.set(key, f);
-          } else if (currentIsMp4 === existingIsMp4 && currentIsH264 && !existingIsH264) {
-            grouped.set(key, f);
-          }
-        }
-      }
-      return Array.from(grouped.values());
+      // Sort: highest resolution first, prefer MP4/H.264
+      return progressive.sort((a, b) => {
+        // Extract numeric resolution from qualityLabel (e.g., "1080p" -> 1080)
+        const getRes = (label: string) => {
+          const m = label.match(/(\d+)p/);
+          return m ? parseInt(m[1], 10) : 0;
+        };
+        const resDiff = getRes(b.qualityLabel) - getRes(a.qualityLabel);
+        if (resDiff !== 0) return resDiff;
+        // Same resolution: prefer MP4, then H.264
+        const aMp4 = a.container?.toLowerCase() === 'mp4';
+        const bMp4 = b.container?.toLowerCase() === 'mp4';
+        const aH264 = a.codec?.toLowerCase() === 'h.264';
+        const bH264 = b.codec?.toLowerCase() === 'h.264';
+        if (aMp4 !== bMp4) return bMp4 ? 1 : -1;
+        if (aH264 !== bH264) return bH264 ? 1 : -1;
+        return 0;
+      });
     }
 
     // Advanced Codecs ON: return split (video-only) formats, preferring MP4/H.264 then VP9/AV1
-    const grouped = new Map<string, YoutubeFormat>();
-    for (const f of formats) {
-      if (!f.hasVideo || f.hasAudio) continue; // only split video streams
-      const key = `${f.qualityLabel}-${f.fps || ''}`;
-      const existing = grouped.get(key);
-      if (!existing) {
-        grouped.set(key, f);
-      } else {
-        const existingIsMp4 = existing.container?.toLowerCase() === 'mp4';
-        const currentIsMp4 = f.container?.toLowerCase() === 'mp4';
-        const existingIsH264 = existing.codec?.toLowerCase() === 'h.264';
-        const currentIsH264 = f.codec?.toLowerCase() === 'h.264';
-        if (currentIsMp4 && !existingIsMp4) {
-          grouped.set(key, f);
-        } else if (currentIsMp4 === existingIsMp4 && currentIsH264 && !existingIsH264) {
-          grouped.set(key, f);
-        }
-      }
-    }
-    return Array.from(grouped.values());
+    const split = formats.filter(f => f.hasVideo && !f.hasAudio);
+    return split.sort((a, b) => {
+      const getRes = (label: string) => {
+        const m = label.match(/(\d+)p/);
+        return m ? parseInt(m[1], 10) : 0;
+      };
+      const resDiff = getRes(b.qualityLabel) - getRes(a.qualityLabel);
+      if (resDiff !== 0) return resDiff;
+      const aMp4 = a.container?.toLowerCase() === 'mp4';
+      const bMp4 = b.container?.toLowerCase() === 'mp4';
+      const aH264 = a.codec?.toLowerCase() === 'h.264';
+      const bH264 = b.codec?.toLowerCase() === 'h.264';
+      if (aMp4 !== bMp4) return bMp4 ? 1 : -1;
+      if (aH264 !== bH264) return bH264 ? 1 : -1;
+      return 0;
+    });
   };
 
   const [history, setHistory] = useState<HistoryItem[]>(() => {
