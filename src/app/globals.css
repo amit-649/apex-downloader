@@ -161,22 +161,23 @@ body::after {
 }
 
 .brand-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-  background: rgba(10, 9, 21, 0.9);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 4px 18px var(--insta-glow);
-  position: relative;
-  overflow: hidden;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  box-shadow: none;
+  border: none;
   flex-shrink: 0;
-  border: 1px solid var(--card-border);
+  position: relative;
+  overflow: visible;
 }
 
 .brand-logo.pin-logo {
-  box-shadow: 0 4px 18px var(--pin-glow);
+  background: transparent;
+  box-shadow: none;
+  border: none;
 }
 
 /* ===== Crisp SVG Vector Morphing Animation (Zero Tangled Wires) ===== */
