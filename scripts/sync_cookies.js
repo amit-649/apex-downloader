@@ -149,23 +149,10 @@ async function extractInstagram(browser) {
 // ============================================================
 // Vercel CLI Integrator
 // ============================================================
-function syncToRailway(key, value) {
-  return new Promise((resolve) => {
-    console.log(`🚂 Syncing ${key} to Railway production...`);
-    try {
-      execSync(`railway variables set ${key}="${value.replace(/"/g, '\\"')}"`, { stdio: 'ignore', shell: true });
-      console.log(`  ✅ Successfully updated ${key} on Railway!`);
-    } catch (e) {
-      console.log(`  ℹ️  Railway CLI sync skipped (if Vercel Integration is linked in Railway, it syncs automatically).`);
-    }
-    resolve();
-  });
-}
-
 function syncToVercel(key, value) {
   return new Promise((resolve) => {
     console.log(`☁️  Syncing ${key} to Vercel production...`);
-    
+
     // Remove existing variable if present
     try {
       execSync(`vercel env rm ${key} production --yes`, { stdio: 'ignore', shell: true });
@@ -188,6 +175,37 @@ function syncToVercel(key, value) {
       resolve();
     });
   });
+}
+
+// Bootstrap: write YouTube cookies straight into Neon DB via the admin API.
+// This is how the Render auto-refresher gets its initial session — no
+// Vercel redeploy required.
+async function bootstrapNeonDb(ytCookies) {
+  if (!ytCookies) return;
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) {
+    console.log('  ℹ️  ADMIN_SECRET not set — skipping Neon DB bootstrap (Vercel env var sync still works).');
+    return;
+  }
+  const baseUrl = process.env.VERCEL_BASE_URL || 'https://apexdown.vercel.app';
+  console.log('  🗄️  Bootstrapping YouTube cookies into Neon DB...');
+  try {
+    const res = await fetch(`${baseUrl}/api/admin/sessions/cookies`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-secret': adminSecret,
+      },
+      body: JSON.stringify({ cookie_text: ytCookies }),
+    });
+    if (res.ok) {
+      console.log('  ✅ Neon DB YouTube session bootstrapped.');
+    } else {
+      console.log(`  ⚠️  Neon DB bootstrap failed (${res.status}): ${await res.text()}`);
+    }
+  } catch (e) {
+    console.log('  ⚠️  Neon DB bootstrap error:', e.message);
+  }
 }
 
 function deployToVercel() {
@@ -331,22 +349,20 @@ async function run() {
     }
   }
 
-  // --- STEP 3: Vercel & Railway Push ---
+  // --- STEP 3: Vercel Push + Neon DB Bootstrap ---
   let hasSyncedAny = false;
 
   if (runYt && ytCookies) {
     await syncToVercel('YOUTUBE_COOKIES', ytCookies);
-    await syncToRailway('YOUTUBE_COOKIES', ytCookies);
+    await bootstrapNeonDb(ytCookies);
     hasSyncedAny = true;
   }
   if (runIg && igSession) {
     const sessionIdOnly = igSession.split('; ').find(c => c.startsWith('sessionid='))?.split('=')[1] || '';
     if (sessionIdOnly) {
       await syncToVercel('INSTAGRAM_SESSION_ID', sessionIdOnly);
-      await syncToRailway('INSTAGRAM_SESSION_ID', sessionIdOnly);
     }
     await syncToVercel('INSTAGRAM_COOKIES', igSession);
-    await syncToRailway('INSTAGRAM_COOKIES', igSession);
     hasSyncedAny = true;
   }
 

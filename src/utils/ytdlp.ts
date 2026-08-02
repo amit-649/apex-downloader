@@ -155,6 +155,16 @@ export async function getInfo(url: string): Promise<YtDlpInfo> {
     if (isBotBlock) {
       console.warn('🔴 Bot block detected — marking current YouTube session as failed.');
       await markSessionFailed('youtube');
+      // Fire-and-forget trigger to Render's cookie refresher (if configured)
+      const refresherUrl = process.env.NEXT_PUBLIC_MERGER_URL;
+      const refresherSecret = process.env.REFRESHER_SECRET;
+      if (refresherUrl && refresherSecret) {
+        fetch(`${refresherUrl.replace(/\/$/, '')}/api/refresh-cookies`, {
+          method: 'POST',
+          headers: { 'x-refresher-secret': refresherSecret },
+          // No await — fire and forget; don't slow down the download response
+        }).catch(e => console.warn('[ytdlp] Refresher trigger failed:', e.message));
+      }
     }
 
     // Attempt 2: Rotate player clients (ios, android, web) to bypass bot verification

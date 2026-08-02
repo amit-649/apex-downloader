@@ -6,12 +6,18 @@ const fs = require('fs');
 const { neon } = require('@neondatabase/serverless');
 require('dotenv').config();
 
+// Cookie Refresher (auto-refresh worker)
+const { startPeriodic, attachRefresherRoutes } = require('./cookie-refresher');
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Attach cookie refresher routes (periodic + on-demand)
+attachRefresherRoutes(app);
 
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -326,9 +332,49 @@ app.all('/api/merge', async (req, res) => {
     return res.status(500).json({ error: 'FFmpeg binary is not available.' });
   }
 
+  // ── SSRF guard ──────────────────────────────────────────────────────────────
+  // Client-supplied stream URLs are NOT trusted: an attacker could point FFmpeg
+  // at internal services / cloud metadata. We only ever follow https URLs whose
+  // host is an allowed media host (same policy as the Vercel proxy). The first
+  // hop is validated here; ffmpeg's internal redirects (typically CDN mirrors
+  // under the same allowed hosts) are not followed. The Next.js client always
+  // omits these fields (it re-extracts from `url`), so this path only serves
+  // legacy/other callers.
+  const MEDIA_HOST_ALLOWLIST = [
+    'googlevideo.com',
+    'ytimg.com',
+    'cdninstagram.com',
+    'fbcdn.net',
+    'pinimg.com',
+    'pinterest.com',
+  ];
+  const matchesAllowedMediaHost = (hostname) =>
+    MEDIA_HOST_ALLOWLIST.some(
+      (domain) => hostname === domain || hostname.endsWith('.' + domain)
+    );
+  const assertSafeStreamUrl = (value, label) => {
+    if (!value) return null;
+    if (value === 'disabled') return null; // sentinel from the Next.js client
+    let parsed;
+    try {
+      parsed = new URL(value);
+    } catch {
+      return null; // unparseable → treat as absent
+    }
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
+    if (!matchesAllowedMediaHost(parsed.hostname)) return null;
+    return value;
+  };
+  const videoUrl = assertSafeStreamUrl(rawVideoUrl, 'videoUrl');
+  const audioUrl = assertSafeStreamUrl(rawAudioUrl, 'audioUrl');
+
+  if (!url && (!videoUrl || !audioUrl)) {
+    return res.status(400).json({ error: 'YouTube URL or stream URLs are required.' });
+  }
+
   try {
-    let finalVideoUrl = rawVideoUrl;
-    let finalAudioUrl = rawAudioUrl;
+    let finalVideoUrl = videoUrl;
+    let finalAudioUrl = audioUrl;
 
     // ⚠️ ALWAYS re-extract fresh stream URLs on Render's own IP when a YouTube URL is given.
     // Client-supplied videoUrl/audioUrl are IP-locked to whichever server fetched details;
@@ -393,7 +439,7 @@ app.all('/api/merge', async (req, res) => {
 
     console.log(`[Merger] ⚡ Starting FFmpeg live stream pipe for "${filename}.mp4"...`);
 
-    const command = ffmpeg()
+      const command = ffmpeg()
       .input(finalVideoUrl)
       .inputOptions([
         '-headers', `User-Agent: ${BROWSER_HEADERS['User-Agent']}\r\nReferer: https://www.youtube.com/\r\n`,
@@ -448,6 +494,9 @@ app.listen(PORT, () => {
   console.log(`   yt-dlp path: ${getYtDlpPath()}`);
   console.log(`   FFmpeg available: ${Boolean(ffmpeg)}`);
 });
+
+// Start the periodic cookie refresher (auto-rotate every ~6h)
+startPeriodic();
 
 // Ensure yt-dlp is current before serving merge requests (fixes
 // "Requested format is not available" caused by an outdated binary).

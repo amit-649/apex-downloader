@@ -4,9 +4,14 @@ providers = ["node"]
 [variables]
 PUPPETEER_SKIP_DOWNLOAD = "true"
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
+CHROMIUM_PATH = "/usr/bin/chromium"
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "ffmpeg"]
+# chromium is needed by the cookie-refresher worker on Render; the merger
+# itself needs ffmpeg. puppeteer-core uses the system chromium via
+# PUPPETEER_EXECUTABLE_PATH (nixpacks makes it available).
+nixPkgs = ["nodejs_20", "ffmpeg", "chromium"]
 
 [phases.build]
 cmds = ["npm run build"]

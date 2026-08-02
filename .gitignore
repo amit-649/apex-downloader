@@ -46,6 +46,9 @@ next-env.d.ts
 cookies.txt
 youtube-cookies.txt
 *-player-script.js
+# yt-dlp runtime temp files written to cwd on Windows (SENSITIVE - never commit)
+env_yt_cookies.txt
+yt_potoken_cache.json
 
 .vercel
 .env*

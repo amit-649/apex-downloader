@@ -201,10 +201,8 @@ export default function Home() {
 
   // Compatibility filter (MP4/H.264 prioritization & Audio streamlining)
   const getCompatibleFormats = (formats: YoutubeFormat[], isVideo: boolean): YoutubeFormat[] => {
-    if (showAdvancedCodecs) return formats;
-
     if (!isVideo) {
-      // Keep only top High Quality (~320kbps) and Standard (~140kbps) audio options in basic mode
+      // Keep only top High Quality (~320kbps) and Standard (~140kbps) audio options
       const sorted = [...formats].sort((a, b) => (b.audioBitrate || b.sizeBytes || 0) - (a.audioBitrate || a.sizeBytes || 0));
       if (sorted.length === 0) return [];
       const best = sorted[0];
@@ -212,12 +210,38 @@ export default function Home() {
       return standard ? [best, standard] : [best];
     }
 
-    const grouped = new Map<string, YoutubeFormat>();
+    // When Advanced Codecs is OFF (default): return progressive formats only (direct download)
+    if (!showAdvancedCodecs) {
+      // Filter to only progressive (video+audio) formats and dedupe by quality
+      const progressive = formats.filter(f => f.hasVideo && f.hasAudio);
+      const grouped = new Map<string, YoutubeFormat>();
+      for (const f of progressive) {
+        const key = `${f.qualityLabel}-${f.fps || ''}`;
+        const existing = grouped.get(key);
+        if (!existing) {
+          grouped.set(key, f);
+        } else {
+          // Prefer MP4/H.264
+          const existingIsMp4 = existing.container?.toLowerCase() === 'mp4';
+          const currentIsMp4 = f.container?.toLowerCase() === 'mp4';
+          const existingIsH264 = existing.codec?.toLowerCase() === 'h.264';
+          const currentIsH264 = f.codec?.toLowerCase() === 'h.264';
+          if (currentIsMp4 && !existingIsMp4) {
+            grouped.set(key, f);
+          } else if (currentIsMp4 === existingIsMp4 && currentIsH264 && !existingIsH264) {
+            grouped.set(key, f);
+          }
+        }
+      }
+      return Array.from(grouped.values());
+    }
 
+    // Advanced Codecs ON: return split (video-only) formats, preferring MP4/H.264 then VP9/AV1
+    const grouped = new Map<string, YoutubeFormat>();
     for (const f of formats) {
+      if (!f.hasVideo || f.hasAudio) continue; // only split video streams
       const key = `${f.qualityLabel}-${f.fps || ''}`;
       const existing = grouped.get(key);
-
       if (!existing) {
         grouped.set(key, f);
       } else {
@@ -225,17 +249,13 @@ export default function Home() {
         const currentIsMp4 = f.container?.toLowerCase() === 'mp4';
         const existingIsH264 = existing.codec?.toLowerCase() === 'h.264';
         const currentIsH264 = f.codec?.toLowerCase() === 'h.264';
-
         if (currentIsMp4 && !existingIsMp4) {
           grouped.set(key, f);
-        } else if (currentIsMp4 === existingIsMp4) {
-          if (currentIsH264 && !existingIsH264) {
-            grouped.set(key, f);
-          }
+        } else if (currentIsMp4 === existingIsMp4 && currentIsH264 && !existingIsH264) {
+          grouped.set(key, f);
         }
       }
     }
-
     return Array.from(grouped.values());
   };
 
@@ -498,6 +518,9 @@ export default function Home() {
           title: cleanTitle,
           videoItag: String(selectedVideoFormat.itag),
           audioItag: String(selectedAudioFormat.itag),
+          // Disable the raw stream-URL path (SSRF risk); the merger re-extracts from `url` itself.
+          videoUrl: 'disabled',
+          audioUrl: 'disabled',
         };
 
         for (const [key, val] of Object.entries(fields)) {
@@ -927,7 +950,7 @@ function YoutubeView({
 
       {hd.length > 0 && (
         <>
-          <div className="subhead">High definition · merged in your browser</div>
+          <div className="subhead">High definition · split streams (merged in browser)</div>
           <div className="format-grid">
             {hd.map((f, idx) => (
               <FormatCard
@@ -948,7 +971,7 @@ function YoutubeView({
 
       {sd.length > 0 && (
         <>
-          <div className="subhead">Standard · direct download</div>
+          <div className="subhead">Standard · pre-merged (direct download)</div>
           <div className="format-grid">
             {sd.map((f, idx) => (
               <FormatCard
