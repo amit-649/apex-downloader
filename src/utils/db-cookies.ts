@@ -1,6 +1,6 @@
 import { getDb } from '@/utils/db';
 
-export type Platform = 'youtube' | 'instagram';
+export type Platform = 'instagram' | 'pinterest';
 
 export interface AuthSession {
   id: number;
@@ -15,13 +15,10 @@ export interface AuthSession {
   updated_at: string;
 }
 
-// ─── In-memory cache ──────────────────────────────────────────────────────────
-// Avoids hitting the DB on every single serverless invocation.
-// TTL: 5 minutes. Cache is invalidated on rotation/failure.
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache: Record<Platform, { session: AuthSession | null; fetchedAt: number } | null> = {
-  youtube: null,
   instagram: null,
+  pinterest: null,
 };
 
 function isCacheValid(platform: Platform): boolean {
@@ -37,7 +34,6 @@ function clearCache(platform: Platform) {
   cache[platform] = null;
 }
 
-// Helper: cast a raw row from Neon to AuthSession
 function toSession(row: Record<string, unknown>): AuthSession {
   return {
     id: row.id as number,
@@ -53,12 +49,6 @@ function toSession(row: Record<string, unknown>): AuthSession {
   };
 }
 
-// ─── DB Queries ───────────────────────────────────────────────────────────────
-
-/**
- * Fetch the first active session for the given platform from Neon DB.
- * Falls back to null if DB is unavailable.
- */
 async function fetchActiveSessionFromDb(platform: Platform): Promise<AuthSession | null> {
   const sql = getDb();
   if (!sql) return null;
@@ -78,9 +68,6 @@ async function fetchActiveSessionFromDb(platform: Platform): Promise<AuthSession
   }
 }
 
-/**
- * Get the active session for a platform, using in-memory cache first.
- */
 export async function getActiveSession(platform: Platform): Promise<AuthSession | null> {
   if (isCacheValid(platform)) {
     return cache[platform]!.session;
@@ -98,42 +85,20 @@ export async function getActiveSession(platform: Platform): Promise<AuthSession 
   return session;
 }
 
-/**
- * Get cookie string for the given platform.
- * Returns DB cookie first, then falls back to env vars.
- */
 export async function getActiveCookieText(platform: Platform): Promise<string | null> {
   const session = await getActiveSession(platform);
   if (session?.cookie_text) return session.cookie_text;
 
-  // Env var fallback
-  if (platform === 'youtube') return process.env.YOUTUBE_COOKIES ?? null;
   if (platform === 'instagram') return process.env.INSTAGRAM_COOKIES ?? null;
   return null;
 }
 
-/**
- * Get Instagram session ID.
- * Returns DB session_id first, then falls back to env var.
- */
 export async function getInstagramSessionId(): Promise<string | null> {
   const session = await getActiveSession('instagram');
   if (session?.session_id) return session.session_id;
   return process.env.INSTAGRAM_SESSION_ID ?? null;
 }
 
-/**
- * Get YouTube visitor_data string from DB.
- */
-export async function getYouTubeVisitorData(): Promise<string | null> {
-  const session = await getActiveSession('youtube');
-  return session?.visitor_data ?? null;
-}
-
-/**
- * Increment fail_count for the active session.
- * If fail_count >= 3, deactivate it and clear cache so next request rotates.
- */
 export async function markSessionFailed(platform: Platform): Promise<void> {
   const session = await getActiveSession(platform);
   if (!session) return;
@@ -141,7 +106,7 @@ export async function markSessionFailed(platform: Platform): Promise<void> {
   const sql = getDb();
   if (!sql) return;
 
-  clearCache(platform); // force reload next time
+  clearCache(platform);
 
   try {
     const newFailCount = session.fail_count + 1;
@@ -165,35 +130,6 @@ export async function markSessionFailed(platform: Platform): Promise<void> {
   }
 }
 
-/**
- * Update the visitor_data (PO-token) for the active YouTube session.
- */
-export async function updateYouTubeVisitorData(visitorData: string): Promise<void> {
-  const session = await getActiveSession('youtube');
-  if (!session) return;
-
-  const sql = getDb();
-  if (!sql) return;
-
-  try {
-    await sql`
-      UPDATE auth_sessions
-      SET visitor_data = ${visitorData}, updated_at = NOW()
-      WHERE id = ${session.id}
-    `;
-    // Update cache in-place
-    if (cache.youtube?.session) {
-      cache.youtube.session.visitor_data = visitorData;
-    }
-    console.log('[DB] ✅ YouTube visitor_data updated in database.');
-  } catch (e) {
-    console.error('[DB] Failed to update visitor_data:', e instanceof Error ? e.message : e);
-  }
-}
-
-/**
- * List all sessions (for admin API).
- */
 export async function listAllSessions(): Promise<AuthSession[]> {
   const sql = getDb();
   if (!sql) return [];
@@ -207,9 +143,6 @@ export async function listAllSessions(): Promise<AuthSession[]> {
   }
 }
 
-/**
- * Insert a new session.
- */
 export async function insertSession(data: {
   platform: Platform;
   account_name: string;
@@ -236,9 +169,6 @@ export async function insertSession(data: {
   }
 }
 
-/**
- * Update an existing session by ID.
- */
 export async function updateSession(
   id: number,
   data: Partial<{
@@ -253,7 +183,6 @@ export async function updateSession(
   const sql = getDb();
   if (!sql) return null;
 
-  // Fetch current row to get platform for cache-busting
   const currentRows = await sql`SELECT * FROM auth_sessions WHERE id = ${id} LIMIT 1`;
   const current = (currentRows as unknown[])[0] as Record<string, unknown> | undefined;
   if (!current) return null;
@@ -281,9 +210,6 @@ export async function updateSession(
   }
 }
 
-/**
- * Delete a session by ID.
- */
 export async function deleteSession(id: number): Promise<boolean> {
   const sql = getDb();
   if (!sql) return false;

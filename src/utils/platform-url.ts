@@ -1,14 +1,6 @@
-const YOUTUBE_HOSTS = [
-  'youtube.com',
-  'youtu.be',
-  'youtube-nocookie.com',
-] as const;
-
 const PINTEREST_HOSTS = ['pinterest.com', 'pin.it'] as const;
 
 const MEDIA_HOSTS = [
-  'googlevideo.com',
-  'ytimg.com',
   'cdninstagram.com',
   'fbcdn.net',
   'pinimg.com',
@@ -32,14 +24,6 @@ function parseHttpsUrl(value: string, label: string): URL {
     throw new Error(`${label} must be a valid HTTPS URL.`);
   }
 
-  return parsed;
-}
-
-export function assertYoutubeUrl(value: string): URL {
-  const parsed = parseHttpsUrl(value, 'YouTube URL');
-  if (!matchesHost(parsed.hostname, YOUTUBE_HOSTS)) {
-    throw new Error('Please provide a YouTube or youtu.be link.');
-  }
   return parsed;
 }
 

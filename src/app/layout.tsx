@@ -15,26 +15,25 @@ const DOMAIN = process.env.NEXT_PUBLIC_SITE_URL || "https://downloader.amitcodes
 
 export const metadata: Metadata = {
   metadataBase: new URL(DOMAIN),
-  title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
-  description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
+  title: "ApexDownloader — Free Instagram Reels, Stories & Pinterest Media Downloader",
+  description: "Free online downloader for Instagram (Reels, Stories, Carousels, Profile Pictures) and Pinterest (Video & Image Pins). Save high-quality media instantly.",
   keywords: [
-    "youtube video downloader",
-    "download youtube 1080p 4k",
     "instagram downloader",
     "download instagram reels",
     "save instagram stories",
+    "instagram carousel downloader",
+    "instagram profile picture downloader",
     "pinterest video downloader",
     "download pinterest images",
     "free video downloader online",
-    "youtube to mp4",
-    "instagram carousel downloader",
+    "pinterest pin saver",
   ],
   alternates: {
     canonical: DOMAIN,
   },
   openGraph: {
-    title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
-    description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
+    title: "ApexDownloader — Free Instagram Reels, Stories & Pinterest Media Downloader",
+    description: "Free online downloader for Instagram (Reels, Stories, Carousels) and Pinterest Pins. Save high-quality media instantly.",
     url: DOMAIN,
     siteName: "ApexDownloader",
     images: [
@@ -49,8 +48,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ApexDownloader — Free YouTube, Instagram & Pinterest Video Downloader",
-    description: "Free online downloader for YouTube (1080p/4K), Instagram (Reels/Stories), and Pinterest. Download high-quality videos, audio, and images instantly.",
+    title: "ApexDownloader — Free Instagram Reels, Stories & Pinterest Media Downloader",
+    description: "Free online downloader for Instagram (Reels, Stories, Carousels) and Pinterest Pins. Save high-quality media instantly.",
     images: ["/og-image.png"],
   },
 };
