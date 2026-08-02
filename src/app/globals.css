@@ -631,9 +631,9 @@ body::after {
   line-height: 1.5;
 }
 
-/* ===== FAQ Section ===== */
+/* ===== FAQ Section Accordion ===== */
 .faq-section {
-  margin-top: 2.5rem;
+  margin-top: 3rem;
 }
 
 .faq-heading {
@@ -650,25 +650,56 @@ body::after {
   gap: 0.75rem;
 }
 
-.faq-item {
+.faq-card {
   background: #FFFFFF;
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
+  padding: 1.1rem 1.25rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.faq-question {
+.faq-card:hover {
+  border-color: var(--card-border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.faq-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.faq-question-text {
   font-weight: 700;
   font-size: 0.98rem;
   color: #0F172A;
-  cursor: pointer;
+  line-height: 1.45;
 }
 
-.faq-answer {
-  margin-top: 0.6rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+.faq-chevron {
+  color: var(--text-muted);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.faq-chevron.rotate {
+  transform: rotate(180deg);
+  color: var(--insta-pink);
+}
+
+.pin-theme .faq-chevron.rotate {
+  color: var(--pin-red);
+}
+
+.faq-card-body {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #F1F5F9;
+  font-size: 0.92rem;
+  color: #334155;
   line-height: 1.6;
 }
 

@@ -14,6 +14,7 @@ import {
   Video,
   Image as ImageIcon,
   Sparkles,
+  ChevronDown,
 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
@@ -367,6 +368,8 @@ function TrustSection() {
 }
 
 function FaqSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
   const faqData = [
     {
       q: 'How to download Pinterest Video Pins in Full HD?',
@@ -386,12 +389,26 @@ function FaqSection() {
     <section className="faq-section">
       <h2 className="faq-heading">Frequently Asked Questions</h2>
       <div className="faq-container">
-        {faqData.map(({ q, a }, i) => (
-          <details key={i} className="faq-item">
-            <summary className="faq-question">{q}</summary>
-            <div className="faq-answer"><p>{a}</p></div>
-          </details>
-        ))}
+        {faqData.map(({ q, a }, i) => {
+          const isOpen = openIndex === i;
+          return (
+            <div
+              key={i}
+              className={`faq-card ${isOpen ? 'open' : ''}`}
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+            >
+              <div className="faq-card-header">
+                <span className="faq-question-text">{q}</span>
+                <ChevronDown className={`faq-chevron ${isOpen ? 'rotate' : ''}`} size={18} />
+              </div>
+              {isOpen && (
+                <div className="faq-card-body">
+                  <p>{a}</p>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
