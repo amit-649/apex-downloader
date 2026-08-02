@@ -256,31 +256,38 @@ export async function GET(request: Request) {
     }
 
 
-    const response = await axios({
-      url: assertMediaUrl(format.url).toString(),
-      method: 'GET',
-      headers: { ...BROWSER_HEADERS, Referer: 'https://www.youtube.com/' },
-      responseType: 'stream',
-      timeout: 30_000,
-      maxRedirects: 5,
-      decompress: false,
-      validateStatus: (status) => status >= 200 && status < 300,
+    // Fetch stream from Googlevideo with browser emulation headers
+    const mediaResponse = await fetch(assertMediaUrl(format.url).toString(), {
+      headers: {
+        'User-Agent': BROWSER_HEADERS['User-Agent'],
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.youtube.com/',
+        'Origin': 'https://www.youtube.com',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Dest': 'video',
+      },
     });
-    const passThrough = new PassThrough();
-    (response.data as Readable).pipe(passThrough);
+
+    if (!mediaResponse.ok) {
+      console.error(`Googlevideo fetch failed with status ${mediaResponse.status}`);
+      return NextResponse.json(
+        { error: `Media host returned status ${mediaResponse.status}` },
+        { status: mediaResponse.status }
+      );
+    }
 
     const extension = format.ext || (formatIsAudio ? 'm4a' : 'mp4');
-    const contentType = String(response.headers['content-type'] || (formatIsAudio ? 'audio/*' : 'video/*'));
+    const contentType = mediaResponse.headers.get('content-type') || (formatIsAudio ? 'audio/mp4' : 'video/mp4');
     const headers = new Headers({
       'Content-Type': contentType,
       'Content-Disposition': `attachment; filename="${filename}.${extension}"`,
       'Cache-Control': 'private, no-store',
     });
-    if (response.headers['content-length']) {
-      headers.set('Content-Length', String(response.headers['content-length']));
-    }
+    const cl = mediaResponse.headers.get('content-length');
+    if (cl) headers.set('Content-Length', cl);
 
-    return new Response(toWebStream(passThrough), { headers });
+    return new Response(mediaResponse.body, { headers });
   } catch (error: unknown) {
     console.error('Error in single format download:', error);
     return NextResponse.json({ error: errorMessage(error, 'Download failed') }, { status: 500 });
