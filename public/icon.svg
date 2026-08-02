@@ -23,18 +23,18 @@
   <!-- Outer Neon Border Ring -->
   <rect x="12" y="12" width="488" height="488" rx="128" stroke="url(#infinityGrad)" stroke-width="12" stroke-opacity="0.6" fill="none" filter="url(#neonGlow)" />
 
-  <!-- The Apex Infinity Loop Arrow Monogram -->
+  <!-- True Interlocking Figure-8 Infinity Loop Emblem -->
   <g filter="url(#neonGlow)">
-    <!-- Infinity 'A' Outer Arch -->
-    <path d="M140 330 C130 220, 200 130, 256 130 C312 130, 382 220, 372 330" 
-          stroke="url(#infinityGrad)" stroke-width="44" stroke-linecap="round" fill="none" />
+    <!-- Figure-8 Infinity Loop Path -->
+    <path d="M256 256 c-45-45 -105-65 -145-25 s-10 100 50 130 s105-60 105-105 c0-45 45-105 105-105 s105 65 65 105 s-105 60-105 0" 
+          stroke="url(#infinityGrad)" stroke-width="40" stroke-linecap="round" fill="none" />
     
-    <!-- Central Downward Arrow Stem & Arrowhead -->
-    <path d="M256 130 V315 M175 234 L256 315 L337 234" 
-          stroke="url(#arrowGrad)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <!-- Central Downward Arrow -->
+    <path d="M256 120 V330 M175 249 L256 330 L337 249" 
+          stroke="url(#arrowGrad)" stroke-width="42" stroke-linecap="round" stroke-linejoin="round" fill="none" />
 
-    <!-- Bottom Tray Line -->
-    <path d="M140 395 H372" 
-          stroke="url(#arrowGrad)" stroke-width="40" stroke-linecap="round" />
+    <!-- Bottom Anchor Line -->
+    <path d="M140 405 H372" 
+          stroke="url(#arrowGrad)" stroke-width="38" stroke-linecap="round" />
   </g>
 </svg>

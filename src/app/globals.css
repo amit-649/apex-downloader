@@ -169,11 +169,35 @@ body::after {
   display: grid;
   place-items: center;
   box-shadow: 0 4px 15px var(--insta-glow);
+  position: relative;
+  overflow: hidden;
 }
 
 .brand-logo.pin-logo {
   background: var(--pin-gradient);
   box-shadow: 0 4px 15px var(--pin-glow);
+}
+
+.brand-logo svg {
+  transition: transform 0.3s ease;
+}
+
+.brand-link:hover .brand-logo svg {
+  transform: scale(1.12);
+}
+
+.infinity-loop-path {
+  stroke-dasharray: 22 8;
+  animation: infinityDashLoop 2.4s linear infinite;
+}
+
+@keyframes infinityDashLoop {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -30;
+  }
 }
 
 .brand-title {
