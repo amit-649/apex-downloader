@@ -1,5 +1,6 @@
 :root {
-  --font-outfit: var(--font-outfit), 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: var(--font-sans), 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: var(--font-heading), 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --bg-gradient: radial-gradient(circle at top, #141226 0%, #030308 100%);
   --card-bg: rgba(12, 12, 24, 0.75);
   --card-border: rgba(255, 255, 255, 0.08);
@@ -50,11 +51,15 @@ html, body {
   min-height: 100vh;
   background: var(--bg-gradient);
   color: var(--text-primary);
-  font-family: var(--font-outfit);
+  font-family: var(--font-sans);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
+}
+
+h1, h2, h3, h4, .brand-title, .preview-title, .faq-heading, .eyebrow {
+  font-family: var(--font-heading);
 }
 
 /* ===== Theme Background Overrides ===== */
