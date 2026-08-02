@@ -178,26 +178,48 @@ body::after {
   box-shadow: 0 4px 15px var(--pin-glow);
 }
 
-.brand-logo svg {
-  transition: transform 0.3s ease;
+/* ===== Morphing Logo Animation (Letter A <-> Download Arrow) ===== */
+.morph-logo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
-.brand-link:hover .brand-logo svg {
-  transform: scale(1.12);
+.morph-logo-svg {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.infinity-loop-path {
-  stroke-dasharray: 22 8;
-  animation: infinityDashLoop 2.4s linear infinite;
+.morph-logo-svg .path-group-a,
+.morph-logo-svg .path-group-download {
+  transition: opacity 0.35s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
 }
 
-@keyframes infinityDashLoop {
-  0% {
-    stroke-dashoffset: 0;
-  }
-  100% {
-    stroke-dashoffset: -30;
-  }
+/* State 1: Letter A */
+.morph-logo-svg.state-a .path-group-a {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.morph-logo-svg.state-a .path-group-download {
+  opacity: 0;
+  transform: scale(0.7) translateY(-6px);
+  pointer-events: none;
+}
+
+/* State 2: Download Symbol */
+.morph-logo-svg.state-download .path-group-a {
+  opacity: 0;
+  transform: scale(0.7) translateY(6px);
+  pointer-events: none;
+}
+
+.morph-logo-svg.state-download .path-group-download {
+  opacity: 1;
+  transform: scale(1) translateY(0);
 }
 
 .brand-title {

@@ -4,20 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { History, Settings } from 'lucide-react';
-
-const ApexInfinityLogo = ({ size = 22 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-    className="infinity-logo-svg">
-    {/* Interlocking Figure-8 Infinity Loop */}
-    <path d="M12 12c-2.2-2.2-5-3-7-1.2S3.5 16 6.5 17.5 12 14.2 12 12c0-2.2 3.2-5 5.5-3.2s3.5 5.2 0.5 6.7S12 14.2 12 12z"
-      className="infinity-loop-path" />
-    {/* Downward Media Arrow */}
-    <path d="M12 6v10.5" />
-    <path d="m8.5 13 3.5 3.5 3.5-3.5" />
-    <path d="M6 20h12" />
-  </svg>
-);
+import { ApexMorphLogo } from './ApexMorphLogo';
 
 const InstagramIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -56,7 +43,7 @@ export function Header({
     <header className="site-header">
       <Link href={isPinterest ? '/pinterest' : '/'} className="brand-link">
         <div className={`brand-logo ${isPinterest ? 'pin-logo' : ''}`}>
-          <ApexInfinityLogo size={22} />
+          <ApexMorphLogo size={20} />
         </div>
         <span className="brand-title">ApexDownloader</span>
       </Link>
