@@ -948,6 +948,44 @@ body::after {
   .trust-grid {
     grid-template-columns: 1fr;
   }
+
+  .preview {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .thumb {
+    width: 100%;
+    max-width: 240px;
+    max-height: 320px;
+    margin: 0 auto;
+  }
+
+  .preview-body {
+    width: 100%;
+    align-items: center;
+    text-align: center;
+  }
+
+  .preview-body > div {
+    width: 100%;
+    flex-direction: column !important;
+    gap: 0.6rem !important;
+  }
+
+  .preview-body .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .caption {
+    text-align: center;
+  }
 }
 
 /* ===== Skeleton Loader ===== */
