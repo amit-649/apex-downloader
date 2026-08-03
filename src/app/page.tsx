@@ -349,7 +349,24 @@ export default function InstagramPage() {
             {(meta.type === 'video' || meta.type === 'image' || meta.type === 'story') && (
               <div className="preview">
                 <div className="thumb">
-                  <img src={meta.thumbnailUrl || meta.downloadUrl} alt="Instagram Media" />
+                  {meta.type === 'video' ? (
+                    <video
+                      src={meta.downloadUrl}
+                      poster={meta.thumbnailUrl || undefined}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <img
+                      src={meta.thumbnailUrl || meta.downloadUrl}
+                      alt="Instagram Media"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="preview-body">
                   <span className="eyebrow">Instagram {meta.type.toUpperCase()}</span>

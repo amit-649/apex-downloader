@@ -290,8 +290,25 @@ export default function PinterestPage() {
 
         {meta && (
           <div className="preview">
-            <div className={`thumb ${meta.type === 'image' ? 'thumb-portrait' : ''}`}>
-              <img src={meta.thumbnailUrl} alt={meta.title} />
+            <div className="thumb">
+              {meta.type === 'video' ? (
+                <video
+                  src={meta.downloadUrl}
+                  poster={meta.thumbnailUrl || undefined}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <img
+                  src={meta.thumbnailUrl || meta.downloadUrl}
+                  alt={meta.title}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              )}
             </div>
             <div className="preview-body">
               <span className="eyebrow">Pinterest {meta.type.toUpperCase()} PIN</span>

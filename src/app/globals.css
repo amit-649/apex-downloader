@@ -583,6 +583,138 @@ body::after {
   color: var(--pin-red);
 }
 
+/* ===== Media Preview Card ===== */
+.preview {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  background: #FFFFFF;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  margin-top: 1.25rem;
+  align-items: flex-start;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
+}
+
+.thumb {
+  position: relative;
+  width: 180px;
+  max-width: 100%;
+  aspect-ratio: 9/16;
+  max-height: 280px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #F1F5F9;
+  border: 1px solid var(--card-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb img,
+.thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border: none;
+  outline: none;
+}
+
+.thumb-round {
+  width: 110px;
+  height: 110px;
+  aspect-ratio: 1/1;
+  border-radius: 50%;
+}
+
+.preview-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preview-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0.2rem 0;
+  line-height: 1.35;
+}
+
+.caption {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--insta-pink);
+}
+
+.pin-theme .eyebrow {
+  color: var(--pin-red);
+}
+
+/* Stories & Carousel Grid */
+.stories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.story-card {
+  background: #FFFFFF;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.story-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9/16;
+  max-height: 220px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #F1F5F9;
+}
+
+.story-media img,
+.story-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.story-tag {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: rgba(15, 23, 42, 0.85);
+  color: #FFFFFF;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+}
+
 /* ===== High-Trust Feature Grid Cards ===== */
 .trust-section {
   margin-top: 2rem;
