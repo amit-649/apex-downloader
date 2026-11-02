@@ -122,6 +122,43 @@ export async function GET(request: Request) {
       });
     }
 
+    // Method C: Modern 2026 Direct Regex Media Match from HTML / script bundles
+    const videoMatch = html.match(/https:\/\/(?:v\.pinimg\.com|[a-zA-Z0-9.-]+\.pinimg\.com\/[a-zA-Z0-9.-]+)\/[^\s"'<>]+\.mp4/);
+    if (videoMatch) {
+      const vidUrl = videoMatch[0];
+      const thumbMatch = html.match(/https:\/\/i\.pinimg\.com\/(?:originals|736x)\/[a-f0-9/]+\.(?:jpg|jpeg|png|webp)/);
+      return NextResponse.json({
+        type: 'video',
+        title: ogTitle || 'Pinterest Video',
+        description: ogDescription,
+        downloadUrl: vidUrl,
+        thumbnailUrl: thumbMatch ? thumbMatch[0] : '',
+      });
+    }
+
+    const origImageMatch = html.match(/https:\/\/i\.pinimg\.com\/originals\/[a-f0-9/]+\.(?:jpg|jpeg|png|webp)/);
+    if (origImageMatch) {
+      return NextResponse.json({
+        type: 'image',
+        title: ogTitle || 'Pinterest Image',
+        description: ogDescription,
+        downloadUrl: origImageMatch[0],
+        thumbnailUrl: origImageMatch[0],
+      });
+    }
+
+    const highResMatch = html.match(/https:\/\/i\.pinimg\.com\/736x\/[a-f0-9/]+\.(?:jpg|jpeg|png|webp)/);
+    if (highResMatch) {
+      const origUrl = highResMatch[0].replace('/736x/', '/originals/');
+      return NextResponse.json({
+        type: 'image',
+        title: ogTitle || 'Pinterest Image',
+        description: ogDescription,
+        downloadUrl: origUrl,
+        thumbnailUrl: highResMatch[0],
+      });
+    }
+
     return NextResponse.json({ error: 'Could not extract Pinterest media URL' }, { status: 404 });
 
   } catch (error: unknown) {
