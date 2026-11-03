@@ -12,19 +12,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV CHROMIUM_PATH=/usr/bin/chromium
-ENV NODE_ENV=production
 ENV PORT=10000
 ENV HOSTNAME="0.0.0.0"
 
-# Install dependencies (including devDependencies needed for next build)
+# Install all dependencies (ensuring devDependencies like TypeScript are included for next build)
 COPY package*.json ./
-RUN npm install
+RUN npm install --include=dev
 
 # Copy application source code
 COPY . .
 
-# Build Next.js application
+# Build Next.js application using webpack
 RUN npm run build
+
+ENV NODE_ENV=production
 
 EXPOSE 10000
 
